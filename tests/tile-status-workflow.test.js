@@ -666,6 +666,116 @@ async function test8_api_routes_and_filters() {
   assertEq(notFoundResult.status, 404, "不存在的试片返回 404");
 }
 
+async function test9_legacy_entry_guards() {
+  console.log("\nTest 9: 旧入口权限守卫验证");
+
+  await setupMigratedDb();
+
+  const { loadDb, saveDb, getCollections } = await import("../lib/db.js");
+  const { TILE_STATUSES } = await import("../lib/tile-status-machine.js");
+  const { handleAddObservation, handleCreateTile, handleApplyPlan } = await import("../lib/routes.js");
+  const { handleUpdateTileDefectTags, handleAddDefectTag, handleRemoveDefectTag } = await import("../lib/defect-routes.js");
+  const { handleAddBatchTiles, handleRemoveBatchTiles } = await import("../lib/batch-routes.js");
+  const { ensureBatchCollection, insertBatch } = await import("../lib/batch-repository.js");
+
+  const db = await loadDb();
+  const coll = getCollections(db);
+
+  const archivedTile = {
+    id: "AG-GUARD-ARCHIVED",
+    body: "测试坯体",
+    recipe: "松灰42 长石35",
+    ashSource: "南山松灰",
+    kiln: "K-2",
+    peakTemp: 1240,
+    color: "青灰",
+    score: 85,
+    defectTags: [{ name: "流釉", severity: "mild", note: "" }],
+    observations: [{ at: "2026-06-20", note: "测试" }],
+    status: TILE_STATUSES.ARCHIVED,
+    statusHistory: [{ from: null, to: TILE_STATUSES.ARCHIVED, operator: "test", note: "", at: new Date().toISOString() }],
+    batchId: null,
+    inventoryDeducted: true
+  };
+  const draftTile = {
+    id: "AG-GUARD-DRAFT",
+    body: "测试坯体",
+    recipe: "松灰42 长石35",
+    ashSource: "南山松灰",
+    kiln: "K-2",
+    peakTemp: 1240,
+    status: TILE_STATUSES.DRAFT,
+    statusHistory: [{ from: null, to: TILE_STATUSES.DRAFT, operator: "test", note: "", at: new Date().toISOString() }],
+    batchId: null,
+    inventoryDeducted: false,
+    defectTags: [],
+    observations: []
+  };
+  const firedTile = {
+    id: "AG-GUARD-FIRED",
+    body: "测试坯体",
+    recipe: "松灰42 长石35",
+    ashSource: "南山松灰",
+    kiln: "K-2",
+    peakTemp: 1240,
+    status: TILE_STATUSES.FIRED,
+    statusHistory: [{ from: null, to: TILE_STATUSES.FIRED, operator: "test", note: "", at: new Date().toISOString() }],
+    batchId: null,
+    inventoryDeducted: true,
+    defectTags: [],
+    observations: []
+  };
+  coll.tiles.push(archivedTile, draftTile, firedTile);
+
+  ensureBatchCollection(db);
+  insertBatch(db, { id: "BATCH-GUARD", name: "守卫测试批次", kiln: "K-2", tileIds: [], status: "planned", observations: [], createdAt: "2026-06-20", updatedAt: "2026-06-20" });
+
+  await saveDb(db);
+
+  const obsArchived = await handleAddObservation("AG-GUARD-ARCHIVED", { note: "不应该被添加" }, db);
+  assertEq(obsArchived.status, 400, "已归档试片通过旧入口添加观察记录被拒绝");
+  assert(obsArchived.data.error === "fields_not_allowed", "观察记录拒绝错误类型正确");
+
+  const obsDraft = await handleAddObservation("AG-GUARD-DRAFT", { note: "应该被添加" }, db);
+  assertEq(obsDraft.status, 201, "草稿试片通过旧入口添加观察记录成功");
+
+  const defectArchived = await handleUpdateTileDefectTags("AG-GUARD-ARCHIVED", { defectTags: [{ name: "缩釉", severity: "severe" }] }, db);
+  assertEq(defectArchived.status, 400, "已归档试片通过旧入口更新缺陷标签被拒绝");
+
+  const defectFired = await handleUpdateTileDefectTags("AG-GUARD-FIRED", { defectTags: [{ name: "缩釉", severity: "severe" }] }, db);
+  assertEq(defectFired.status, 200, "已烧成试片通过旧入口更新缺陷标签成功");
+
+  const addDefectArchived = await handleAddDefectTag("AG-GUARD-ARCHIVED", { name: "开裂", severity: "mild" }, db);
+  assertEq(addDefectArchived.status, 400, "已归档试片通过旧入口添加缺陷标签被拒绝");
+
+  const addDefectDraft = await handleAddDefectTag("AG-GUARD-DRAFT", { name: "开裂", severity: "mild" }, db);
+  assertEq(addDefectDraft.status, 200, "草稿试片通过旧入口添加缺陷标签成功");
+
+  const removeDefectArchived = await handleRemoveDefectTag("AG-GUARD-ARCHIVED", { name: "流釉" }, db);
+  assertEq(removeDefectArchived.status, 400, "已归档试片通过旧入口删除缺陷标签被拒绝");
+
+  const batchAddArchived = await handleAddBatchTiles("BATCH-GUARD", { tileIds: ["AG-GUARD-ARCHIVED"] }, db);
+  assert(batchAddArchived.data.forbidden.length === 1, "已归档试片加入批次被拒绝（forbidden）");
+  assert(batchAddArchived.data.forbidden[0].id === "AG-GUARD-ARCHIVED", "被拒绝的试片 ID 正确");
+
+  const batchAddFired = await handleAddBatchTiles("BATCH-GUARD", { tileIds: ["AG-GUARD-FIRED"] }, db);
+  assert(batchAddFired.data.added.length === 1, "已烧成试片可以加入批次");
+  assertEq(coll.tiles.find(t => t.id === "AG-GUARD-FIRED").batchId, "BATCH-GUARD", "试片 batchId 已同步更新");
+
+  const batchRemoveArchived = await handleRemoveBatchTiles("BATCH-GUARD", { tileIds: ["AG-GUARD-ARCHIVED"] }, db);
+  assert(batchRemoveArchived.data.forbidden.length === 1, "已归档试片从批次移除被拒绝");
+
+  const createResult = await handleCreateTile({
+    body: "新试片坯体",
+    recipe: "松灰42 长石35"
+  }, db);
+  assertEq(createResult.status, 201, "创建试片成功");
+  const newTile = coll.tiles.find(t => t.id === createResult.data.id);
+  assert(newTile.inventoryDeducted === false, "创建试片时库存不扣减（inventoryDeducted=false）");
+  assert(newTile.status === TILE_STATUSES.DRAFT, "创建试片初始状态为草稿");
+  assert(Array.isArray(newTile.statusHistory), "创建试片有状态历史记录");
+}
+
 async function run() {
   try {
     await setupTestEnv();
@@ -678,6 +788,7 @@ async function run() {
     await test6_invalid_transitions();
     await test7_batch_status_transition();
     await test8_api_routes_and_filters();
+    await test9_legacy_entry_guards();
 
     console.log(`\n========== Results: ${passed} passed, ${failed} failed ==========`);
     if (failed > 0) {
