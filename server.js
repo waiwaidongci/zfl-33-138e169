@@ -41,6 +41,15 @@ import {
   handleAddBatchObservation,
   handleGetBatchSummary
 } from "./lib/batch-routes.js";
+import {
+  handleListInventory,
+  handleCreateInventory,
+  handleGetInventory,
+  handleUpdateInventory,
+  handleDeleteInventory,
+  handleInventorySummary,
+  handleBatchNoTiles
+} from "./lib/inventory-routes.js";
 
 const port = Number(process.env.PORT || 3033);
 
@@ -245,6 +254,43 @@ const server = http.createServer(async (req, res) => {
     const batchMatch = url.pathname.match(/^\/batches\/([^/]+)$/);
     if (batchMatch && req.method === "GET") {
       const r = await handleGetBatch(batchMatch[1], db);
+      return send(res, r.status, r.data);
+    }
+
+    if (req.method === "GET" && url.pathname === "/inventory") {
+      const r = await handleListInventory(url, db);
+      return send(res, r.status, r.data);
+    }
+
+    if (req.method === "POST" && url.pathname === "/inventory") {
+      const input = await readJsonBody(req);
+      const r = await handleCreateInventory(input, db);
+      return send(res, r.status, r.data);
+    }
+
+    if (req.method === "GET" && url.pathname === "/inventory/summary") {
+      const r = await handleInventorySummary(db);
+      return send(res, r.status, r.data);
+    }
+
+    const inventoryBatchNoTilesMatch = url.pathname.match(/^\/inventory\/batch-no\/([^/]+)\/tiles$/);
+    if (inventoryBatchNoTilesMatch && req.method === "GET") {
+      const r = await handleBatchNoTiles(decodeURIComponent(inventoryBatchNoTilesMatch[1]), db);
+      return send(res, r.status, r.data);
+    }
+
+    const inventoryMatch = url.pathname.match(/^\/inventory\/([^/]+)$/);
+    if (inventoryMatch && req.method === "GET") {
+      const r = await handleGetInventory(inventoryMatch[1], db);
+      return send(res, r.status, r.data);
+    }
+    if (inventoryMatch && req.method === "PATCH") {
+      const input = await readJsonBody(req);
+      const r = await handleUpdateInventory(inventoryMatch[1], input, db);
+      return send(res, r.status, r.data);
+    }
+    if (inventoryMatch && req.method === "DELETE") {
+      const r = await handleDeleteInventory(inventoryMatch[1], db);
       return send(res, r.status, r.data);
     }
 

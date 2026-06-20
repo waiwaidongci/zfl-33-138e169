@@ -40,6 +40,46 @@
         }
       ],
       "recipeVersionId": "RCV-0001"
+    },
+    {
+      "id": "AG-1781948276375",
+      "body": "粗陶坯",
+      "recipe": "松灰42 长石35 石英18 红土5",
+      "recipeVersionId": "RCV-0001",
+      "ashSource": "南山松灰",
+      "firingCurve": [],
+      "peakTemp": 0,
+      "color": "",
+      "defects": "",
+      "score": 0,
+      "observations": [],
+      "materialBatchRefs": [
+        {
+          "ingredientName": "松灰",
+          "batchNo": "SG-2026-001",
+          "deducted": 4.2,
+          "unit": "kg"
+        },
+        {
+          "ingredientName": "长石",
+          "batchNo": "CS-2026-001",
+          "deducted": 3.5,
+          "unit": "kg"
+        },
+        {
+          "ingredientName": "石英",
+          "batchNo": "SY-2026-001",
+          "deducted": 1.8,
+          "unit": "kg"
+        },
+        {
+          "ingredientName": "红土",
+          "batchNo": "HT-2026-001",
+          "deducted": 0.5,
+          "unit": "kg"
+        }
+      ],
+      "batchWeight": 10
     }
   ],
   "firingPlans": [],
@@ -99,6 +139,73 @@
           "note": "开始装窑"
         }
       ],
+      "createdAt": "2026-06-20",
+      "updatedAt": "2026-06-20"
+    }
+  ],
+  "materialStocks": [
+    {
+      "id": "MAT-001",
+      "name": "松灰",
+      "batchNo": "SG-2026-001",
+      "quantity": 45.8,
+      "unit": "kg",
+      "entryDate": "2026-05-15",
+      "supplier": "南山灰场",
+      "reorderThreshold": 10,
+      "notes": "当年春采集",
+      "createdAt": "2026-05-15",
+      "updatedAt": "2026-05-15"
+    },
+    {
+      "id": "MAT-002",
+      "name": "长石",
+      "batchNo": "CS-2026-001",
+      "quantity": 76.5,
+      "unit": "kg",
+      "entryDate": "2026-05-20",
+      "supplier": "景德镇矿物站",
+      "reorderThreshold": 15,
+      "notes": "钾长石",
+      "createdAt": "2026-05-20",
+      "updatedAt": "2026-05-20"
+    },
+    {
+      "id": "MAT-003",
+      "name": "石英",
+      "batchNo": "SY-2026-001",
+      "quantity": 58.2,
+      "unit": "kg",
+      "entryDate": "2026-05-22",
+      "supplier": "景德镇矿物站",
+      "reorderThreshold": 10,
+      "notes": "200目石英粉",
+      "createdAt": "2026-05-22",
+      "updatedAt": "2026-05-22"
+    },
+    {
+      "id": "MAT-004",
+      "name": "红土",
+      "batchNo": "HT-2026-001",
+      "quantity": 29.5,
+      "unit": "kg",
+      "entryDate": "2026-06-01",
+      "supplier": "本地采集",
+      "reorderThreshold": 5,
+      "notes": "含铁量较高",
+      "createdAt": "2026-06-01",
+      "updatedAt": "2026-06-01"
+    },
+    {
+      "id": "MAT-005",
+      "name": "松灰",
+      "batchNo": "SG-2026-002",
+      "quantity": 5,
+      "unit": "kg",
+      "entryDate": "2026-06-15",
+      "supplier": "北山灰场",
+      "reorderThreshold": 10,
+      "notes": "低库存批次",
       "createdAt": "2026-06-20",
       "updatedAt": "2026-06-20"
     }
