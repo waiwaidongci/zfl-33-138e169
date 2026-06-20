@@ -64,6 +64,14 @@ import {
   handleQueryTilesByDefect,
   handleGetHighFrequencyDefects
 } from "./lib/defect-routes.js";
+import {
+  handleGetDashboardOverview,
+  handleGetDashboardSummary,
+  handleGetRecentObservations,
+  handleGetAshSourceScores,
+  handleGetDefectsByPeakTemp,
+  handleGetLowScoreTiles
+} from "./lib/dashboard-routes.js";
 
 const port = Number(process.env.PORT || 3033);
 
@@ -367,6 +375,36 @@ const server = http.createServer(async (req, res) => {
     if (tileDefectTagsMatch && req.method === "DELETE") {
       const input = await readJsonBody(req);
       const r = await handleRemoveDefectTag(tileDefectTagsMatch[1], input, db);
+      return send(res, r.status, r.data);
+    }
+
+    if (req.method === "GET" && url.pathname === "/dashboard/overview") {
+      const r = await handleGetDashboardOverview(url, db);
+      return send(res, r.status, r.data);
+    }
+
+    if (req.method === "GET" && url.pathname === "/dashboard/summary") {
+      const r = await handleGetDashboardSummary(url, db);
+      return send(res, r.status, r.data);
+    }
+
+    if (req.method === "GET" && url.pathname === "/dashboard/recent-observations") {
+      const r = await handleGetRecentObservations(url, db);
+      return send(res, r.status, r.data);
+    }
+
+    if (req.method === "GET" && url.pathname === "/dashboard/ash-source-scores") {
+      const r = await handleGetAshSourceScores(url, db);
+      return send(res, r.status, r.data);
+    }
+
+    if (req.method === "GET" && url.pathname === "/dashboard/defects-by-peak-temp") {
+      const r = await handleGetDefectsByPeakTemp(url, db);
+      return send(res, r.status, r.data);
+    }
+
+    if (req.method === "GET" && url.pathname === "/dashboard/low-score-tiles") {
+      const r = await handleGetLowScoreTiles(url, db);
       return send(res, r.status, r.data);
     }
 
