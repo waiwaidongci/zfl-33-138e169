@@ -27,6 +27,14 @@ npm start
 | PATCH | `/firing-plans/:id` | 更新规划草稿 |
 | DELETE | `/firing-plans/:id` | 删除规划草稿 |
 | POST | `/firing-plans/:id/apply` | 将规划应用为新试片记录 |
+| GET | `/batches?kiln=&status=&plannedDate=&targetAtmosphere=` | 查询实验批次列表 |
+| POST | `/batches` | 创建实验批次 |
+| GET | `/batches/:id` | 查看批次详情 |
+| POST | `/batches/:id/tiles` | 向批次追加试片 |
+| DELETE | `/batches/:id/tiles` | 从批次移除试片 |
+| PATCH | `/batches/:id/status` | 推进批次状态 |
+| POST | `/batches/:id/observations` | 添加批次观察记录 |
+| GET | `/batches/:id/summary` | 生成批次结果摘要 |
 
 ---
 
@@ -478,3 +486,147 @@ curl -X POST http://localhost:3033/firing-plans/FP-TEST-001/apply \
 | createdAt | string | 创建日期 |
 | updatedAt | string | 更新日期 |
 | appliedTileId | string | 已应用时关联的试片 id |
+
+---
+
+## 实验批次模块
+
+### 模块概述
+
+实验批次用于把多个香灰釉试片组织成一次烧成实验。批次记录窑炉、计划日期、目标气氛、试片 id 列表、当前状态和批次观察记录，并可基于批次内试片生成结果摘要。
+
+批次状态按以下顺序推进：
+
+```text
+planned -> loading -> firing -> cooling -> completed
+```
+
+### 批次字段定义
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | string | 批次唯一编号，不传时自动生成 `BATCH-001` 形式编号 |
+| name | string | 批次名称 |
+| kiln | string | 窑炉编号 |
+| plannedDate | string | 计划烧成日期，格式建议为 `YYYY-MM-DD` |
+| targetAtmosphere | string | 目标气氛，例如 `氧化`、`还原` |
+| tileIds | array | 批次包含的试片 id 列表 |
+| status | string | 当前状态：`planned`、`loading`、`firing`、`cooling`、`completed` |
+| observations | array | 批次观察记录 `[{at, note}]` |
+| createdAt | string | 创建日期 |
+| updatedAt | string | 更新日期 |
+
+### 1. 创建批次
+
+`POST /batches`
+
+#### 请求参数
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `kiln` | string | ✅ | 窑炉编号 |
+| `id` | string | - | 自定义批次 id |
+| `name` | string | - | 批次名称 |
+| `plannedDate` | string | - | 计划日期，默认当天 |
+| `targetAtmosphere` | string | - | 目标气氛，默认 `氧化` |
+| `tileIds` | array | - | 初始试片 id 列表 |
+
+```bash
+curl -X POST http://localhost:3033/batches \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "K-2还原气氛松灰釉实验",
+    "kiln": "K-2",
+    "plannedDate": "2026-06-25",
+    "targetAtmosphere": "还原",
+    "tileIds": ["AG-001"]
+  }'
+```
+
+### 2. 查询批次列表
+
+`GET /batches?kiln=K-2&status=loading&plannedDate=2026-06-25&targetAtmosphere=还原`
+
+支持按 `kiln`、`status`、`plannedDate`、`targetAtmosphere` 过滤。
+
+```bash
+curl "http://localhost:3033/batches?kiln=K-2&status=loading"
+```
+
+### 3. 查看批次详情
+
+`GET /batches/:id`
+
+返回批次基础信息，并在 `tiles` 字段中展开已匹配到的试片详情。
+
+```bash
+curl http://localhost:3033/batches/BATCH-001
+```
+
+### 4. 追加试片
+
+`POST /batches/:id/tiles`
+
+`tileIds` 必须为非空数组。若传入不存在的试片 id，会返回 `tile_not_found`。
+
+```bash
+curl -X POST http://localhost:3033/batches/BATCH-001/tiles \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tileIds": ["AG-001"]
+  }'
+```
+
+返回中的 `added` 表示本次新增的试片，`duplicated` 表示已在批次中的试片。
+
+### 5. 移除试片
+
+`DELETE /batches/:id/tiles`
+
+```bash
+curl -X DELETE http://localhost:3033/batches/BATCH-001/tiles \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tileIds": ["AG-001"]
+  }'
+```
+
+返回中的 `removed` 表示已移除的试片，`notInBatch` 表示原本不在批次中的试片。
+
+### 6. 推进批次状态
+
+`PATCH /batches/:id/status`
+
+状态只能保持当前阶段或推进到下一阶段，不能跳级或回退。传入 `note` 时会同时写入一条批次观察记录。
+
+```bash
+curl -X PATCH http://localhost:3033/batches/BATCH-001/status \
+  -H "Content-Type: application/json" \
+  -d '{
+    "status": "firing",
+    "note": "开始升温"
+  }'
+```
+
+### 7. 添加批次观察记录
+
+`POST /batches/:id/observations`
+
+```bash
+curl -X POST http://localhost:3033/batches/BATCH-001/observations \
+  -H "Content-Type: application/json" \
+  -d '{
+    "at": "2026-06-25",
+    "note": "还原气氛稳定"
+  }'
+```
+
+### 8. 生成批次结果摘要
+
+`GET /batches/:id/summary`
+
+摘要会统计批次内已匹配试片的数量、评分、缺陷分布、釉色分布、缺失试片 id 和批次观察记录。
+
+```bash
+curl http://localhost:3033/batches/BATCH-001/summary
+```
