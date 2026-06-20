@@ -51,6 +51,19 @@ import {
   handleInventorySummary,
   handleBatchNoTiles
 } from "./lib/inventory-routes.js";
+import {
+  handleGetDefectCatalog,
+  handleGetOverallDefectStats,
+  handleGetDefectStatsByKiln,
+  handleGetDefectStatsByAshSource,
+  handleGetTileDefectTags,
+  handleUpdateTileDefectTags,
+  handleAddDefectTag,
+  handleRemoveDefectTag,
+  handleRunDefectMigration,
+  handleQueryTilesByDefect,
+  handleGetHighFrequencyDefects
+} from "./lib/defect-routes.js";
 
 const port = Number(process.env.PORT || 3033);
 
@@ -298,6 +311,62 @@ const server = http.createServer(async (req, res) => {
     }
     if (inventoryMatch && req.method === "DELETE") {
       const r = await handleDeleteInventory(inventoryMatch[1], db);
+      return send(res, r.status, r.data);
+    }
+
+    if (req.method === "GET" && url.pathname === "/defects/catalog") {
+      const r = handleGetDefectCatalog();
+      return send(res, r.status, r.data);
+    }
+
+    if (req.method === "GET" && url.pathname === "/defects/stats/overall") {
+      const r = await handleGetOverallDefectStats(db);
+      return send(res, r.status, r.data);
+    }
+
+    if (req.method === "GET" && url.pathname === "/defects/stats/by-kiln") {
+      const r = await handleGetDefectStatsByKiln(url, db);
+      return send(res, r.status, r.data);
+    }
+
+    if (req.method === "GET" && url.pathname === "/defects/stats/by-ash-source") {
+      const r = await handleGetDefectStatsByAshSource(url, db);
+      return send(res, r.status, r.data);
+    }
+
+    if (req.method === "GET" && url.pathname === "/defects/high-frequency") {
+      const r = await handleGetHighFrequencyDefects(url, db);
+      return send(res, r.status, r.data);
+    }
+
+    if (req.method === "GET" && url.pathname === "/defects/query/tiles") {
+      const r = await handleQueryTilesByDefect(url, db);
+      return send(res, r.status, r.data);
+    }
+
+    if (req.method === "POST" && url.pathname === "/defects/migrate") {
+      const r = await handleRunDefectMigration(db);
+      return send(res, r.status, r.data);
+    }
+
+    const tileDefectTagsMatch = url.pathname.match(/^\/tiles\/([^/]+)\/defect-tags$/);
+    if (tileDefectTagsMatch && req.method === "GET") {
+      const r = await handleGetTileDefectTags(tileDefectTagsMatch[1], db);
+      return send(res, r.status, r.data);
+    }
+    if (tileDefectTagsMatch && req.method === "PATCH") {
+      const input = await readJsonBody(req);
+      const r = await handleUpdateTileDefectTags(tileDefectTagsMatch[1], input, db);
+      return send(res, r.status, r.data);
+    }
+    if (tileDefectTagsMatch && req.method === "POST") {
+      const input = await readJsonBody(req);
+      const r = await handleAddDefectTag(tileDefectTagsMatch[1], input, db);
+      return send(res, r.status, r.data);
+    }
+    if (tileDefectTagsMatch && req.method === "DELETE") {
+      const input = await readJsonBody(req);
+      const r = await handleRemoveDefectTag(tileDefectTagsMatch[1], input, db);
       return send(res, r.status, r.data);
     }
 

@@ -39,7 +39,19 @@
           "note": "还原气氛后半段偏强"
         }
       ],
-      "recipeVersionId": "RCV-0001"
+      "recipeVersionId": "RCV-0001",
+      "defectTags": [
+        {
+          "name": "流釉",
+          "severity": "mild",
+          "note": ""
+        },
+        {
+          "name": "色差",
+          "severity": "severe",
+          "note": ""
+        }
+      ]
     },
     {
       "id": "AG-1781948276375",
@@ -79,7 +91,8 @@
           "unit": "kg"
         }
       ],
-      "batchWeight": 10
+      "batchWeight": 10,
+      "defectTags": []
     },
     {
       "id": "AG-002",
@@ -99,7 +112,14 @@
           "note": "氧化气氛烧成"
         }
       ],
-      "recipeVersionId": "RCV-0002"
+      "recipeVersionId": "RCV-0002",
+      "defectTags": [
+        {
+          "name": "针孔",
+          "severity": "mild",
+          "note": ""
+        }
+      ]
     },
     {
       "id": "AG-003",
@@ -119,7 +139,8 @@
           "note": "釉面光泽度好"
         }
       ],
-      "recipeVersionId": "RCV-0003"
+      "recipeVersionId": "RCV-0003",
+      "defectTags": []
     },
     {
       "id": "AG-004",
@@ -134,7 +155,8 @@
       "defects": "",
       "score": 80,
       "observations": [],
-      "recipeVersionId": "RCV-0004"
+      "recipeVersionId": "RCV-0004",
+      "defectTags": []
     },
     {
       "id": "AG-005",
@@ -154,7 +176,8 @@
           "note": "还原气氛，釉色温润"
         }
       ],
-      "recipeVersionId": "RCV-0005"
+      "recipeVersionId": "RCV-0005",
+      "defectTags": []
     },
     {
       "id": "AG-006",
@@ -174,7 +197,14 @@
           "note": "柴窑烧成，气氛波动大"
         }
       ],
-      "recipeVersionId": "RCV-0006"
+      "recipeVersionId": "RCV-0006",
+      "defectTags": [
+        {
+          "name": "缩釉",
+          "severity": "medium",
+          "note": ""
+        }
+      ]
     },
     {
       "id": "AG-007",
@@ -189,7 +219,14 @@
       "defects": "边缘流釉",
       "score": 79,
       "observations": [],
-      "recipeVersionId": "RCV-0001"
+      "recipeVersionId": "RCV-0001",
+      "defectTags": [
+        {
+          "name": "流釉",
+          "severity": "mild",
+          "note": ""
+        }
+      ]
     },
     {
       "id": "AG-008",
@@ -209,7 +246,14 @@
           "note": "升温过快导致气泡"
         }
       ],
-      "recipeVersionId": "RCV-0007"
+      "recipeVersionId": "RCV-0007",
+      "defectTags": [
+        {
+          "name": "气泡",
+          "severity": "medium",
+          "note": ""
+        }
+      ]
     },
     {
       "id": "AG-009",
@@ -224,7 +268,8 @@
       "defects": "",
       "score": 86,
       "observations": [],
-      "recipeVersionId": "RCV-0001"
+      "recipeVersionId": "RCV-0001",
+      "defectTags": []
     },
     {
       "id": "AG-010",
@@ -244,7 +289,14 @@
           "note": "配方调整，高岭替换红土"
         }
       ],
-      "recipeVersionId": "RCV-0008"
+      "recipeVersionId": "RCV-0008",
+      "defectTags": [
+        {
+          "name": "针孔",
+          "severity": "medium",
+          "note": ""
+        }
+      ]
     },
     {
       "id": "AG-011",
@@ -264,7 +316,14 @@
           "note": "温度偏高，坯釉膨胀系数不匹配"
         }
       ],
-      "recipeVersionId": "RCV-0009"
+      "recipeVersionId": "RCV-0009",
+      "defectTags": [
+        {
+          "name": "开裂",
+          "severity": "medium",
+          "note": ""
+        }
+      ]
     },
     {
       "id": "AG-012",
@@ -284,7 +343,36 @@
           "note": "最佳配方，釉色温润如玉"
         }
       ],
-      "recipeVersionId": "RCV-0010"
+      "recipeVersionId": "RCV-0010",
+      "defectTags": []
+    },
+    {
+      "id": "AG-1781952430236",
+      "body": "细瓷坯",
+      "recipe": "松灰42 长石35 石英18 红土5",
+      "recipeVersionId": "RCV-0001",
+      "ashSource": "南山松灰",
+      "kiln": "K-1",
+      "firingCurve": [],
+      "peakTemp": 1240,
+      "color": "青白",
+      "defects": "",
+      "defectTags": [
+        {
+          "name": "针孔",
+          "severity": "mild",
+          "note": "少量"
+        },
+        {
+          "name": "色差",
+          "severity": "medium",
+          "note": ""
+        }
+      ],
+      "score": 85,
+      "observations": [],
+      "materialBatchRefs": null,
+      "batchWeight": null
     }
   ],
   "firingPlans": [],
