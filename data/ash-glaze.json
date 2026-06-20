@@ -9,12 +9,24 @@
       "kiln": "K-2",
       "firingCurve": [
         {
+          "temp": 25,
+          "minutes": 0
+        },
+        {
+          "temp": 600,
+          "minutes": 180
+        },
+        {
           "temp": 900,
-          "minutes": 60
+          "minutes": 300
         },
         {
           "temp": 1240,
-          "minutes": 35
+          "minutes": 510
+        },
+        {
+          "temp": 1240,
+          "minutes": 545
         }
       ],
       "peakTemp": 1240,

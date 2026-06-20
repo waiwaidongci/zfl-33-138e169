@@ -165,11 +165,293 @@ curl -X POST http://localhost:3033/import/commit \
 | ashSource | string | - | 灰来源 |
 | glazeThickness | string | - | 施釉厚度 |
 | kiln | string | - | 窑位/窑号 |
-| firingCurve | array | - | 烧成曲线 `[{temp, minutes}]` |
+| firingCurve | array | - | 烧成曲线（累计时间-温度）`[{temp, minutes}]`，按时间递增排列，`minutes` 为从烧成开始的累计分钟数 |
 | peakTemp | number | - | 烧成最高温度 |
 | color | string | - | 釉色 |
 | defects | string | - | 缺陷描述 |
 | score | number | - | 评分 0-100 |
 | observations | array | - | 观察记录 `[{at, note}]` |
+| fromPlanId | string | - | 若从烧成规划创建，记录规划 id |
 
 > **CSV 提示**：`firingCurve`、`observations` 等数组字段在 CSV 中请以 JSON 字符串表示，并用双引号包裹，例如 `"[{""temp"":900,""minutes"":60}]"`。
+
+---
+
+## 烧成曲线规划模块
+
+### 模块概述
+
+烧成曲线规划模块根据用户提交的目标峰值温度、窑炉编号、升温阶段和保温时间，自动生成规范化的 `firingCurve`，并给出风险提示以及与历史试片相似曲线的对比结果。规划可保存为草稿，确认后可直接应用到新的试片记录。
+
+### 已知窑炉配置
+
+系统内置以下窑炉参数用于风险评估：
+
+| 窑号 | 名称 | 温度范围 | 最大升温速率 |
+|------|------|----------|--------------|
+| K-1 | 小型电窑 | 1180~1280℃ | 180℃/h |
+| K-2 | 中型气窑 | 1200~1300℃ | 200℃/h |
+| K-3 | 大型柴窑 | 1220~1320℃ | 220℃/h |
+
+---
+
+### 1. 计算烧成曲线（预览）
+
+`POST /firing-plans/calculate`
+
+仅计算并返回规划结果，**不保存**到数据库。适合前端实时预览。
+
+#### 请求参数
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `peakTemp` | number | ✅ | 目标峰值温度（℃） |
+| `kiln` | string | - | 窑炉编号，用于风险评估 |
+| `holdMinutes` | number | - | 峰值保温时间（分钟），默认 0 |
+| `heatingStages` | array | - | 自定义升温阶段，不提供则使用默认三段升温 |
+
+`heatingStages` 元素结构：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `endTemp` 或 `temp` | number | 阶段目标温度（℃） |
+| `rate` | number | 升温速率 ℃/h（与 `minutes` 二选一） |
+| `minutes` | number | 该阶段总耗时（分钟） |
+
+#### 示例：最简参数（使用默认三段升温）
+
+```bash
+curl -X POST http://localhost:3033/firing-plans/calculate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "peakTemp": 1240,
+    "kiln": "K-2",
+    "holdMinutes": 35
+  }'
+```
+
+#### 示例：自定义升温阶段
+
+```bash
+curl -X POST http://localhost:3033/firing-plans/calculate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "peakTemp": 1260,
+    "kiln": "K-2",
+    "holdMinutes": 40,
+    "heatingStages": [
+      { "endTemp": 600, "rate": 150 },
+      { "endTemp": 1000, "rate": 120 },
+      { "endTemp": 1200, "rate": 80 }
+    ]
+  }'
+```
+
+#### 返回字段说明
+
+```jsonc
+{
+  "peakTemp": 1240,
+  "kiln": "K-2",
+  "holdMinutes": 35,
+  "heatingStages": [],
+  "firingCurve": [                    // 规范化后的烧成曲线
+    { "temp": 600, "minutes": 180 },
+    { "temp": 900, "minutes": 120 },
+    { "temp": 1100, "minutes": 90 },
+    { "temp": 1240, "minutes": 140 }
+  ],
+  "totalDurationMinutes": 530,          // 总烧成时间（分钟）
+  "totalDurationHours": 8.83,           // 总烧成时间（小时）
+  "heatingRates": [                          // 各阶段实际升温速率
+    { "from": 25, "to": 600, "rateCelsiusPerHour": 192 }
+  ],
+  "risks": [                               // 风险提示列表
+    {
+      "level": "info",                     // danger / warning / info
+      "code": "USING_DEFAULT_STAGES",
+      "message": "未提供升温阶段，使用默认三段升温曲线"
+    }
+  ],
+  "riskCount": { "danger": 0, "warning": 0, "info": 1 },
+  "similarCurves": [                        // 历史相似曲线 Top3
+    {
+      "tileId": "AG-001",
+      "tileRecipe": "松灰42 长石35 石英18 红土5",
+      "tileKiln": "K-2",
+      "tilePeakTemp": 1240,
+      "tileScore": 82,
+      "tileColor": "青灰带油滴",
+      "tileDefects": "边缘流釉",
+      "tileFiringCurve": [{ "temp": 900, "minutes": 60 }, { "temp": 1240, "minutes": 35 }],
+      "similarity": 88.3,                    // 相似度 0-100
+      "peakTempDiff": 0                      // 峰值温差
+    }
+  ]
+}
+```
+
+---
+
+### 2. 保存规划草稿
+
+`POST /firing-plans`
+
+将规划保存为草稿，参数与 `/calculate` 相同，额外支持：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `id` | string | 自定义规划 id，不填则自动生成 `FP-{timestamp}` |
+| `name` | string | 规划名称 |
+| `notes` | string | 备注 |
+
+#### 示例
+
+```bash
+curl -X POST http://localhost:3033/firing-plans \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": "FP-TEST-001",
+    "name": "K-2标准1240℃松灰釉",
+    "peakTemp": 1240,
+    "kiln": "K-2",
+    "holdMinutes": 35,
+    "notes": "测试用标准曲线"
+  }'
+```
+
+---
+
+### 3. 查询规划列表
+
+`GET /firing-plans?kiln=K-2&status=draft`
+
+支持查询参数：`kiln`（窑号）、`status`（状态：draft / applied）。
+
+```bash
+curl http://localhost:3033/firing-plans
+```
+
+---
+
+### 4. 查询单个规划
+
+`GET /firing-plans/:id`
+
+```bash
+curl http://localhost:3033/firing-plans/FP-TEST-001
+```
+
+---
+
+### 5. 更新规划
+
+`PATCH /firing-plans/:id`
+
+可部分更新，若修改 `peakTemp`、`holdMinutes`、`heatingStages`、`kiln` 会自动重新计算 `firingCurve`、`risks`、`similarCurves`。
+
+```bash
+curl -X PATCH http://localhost:3033/firing-plans/FP-TEST-001 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "holdMinutes": 45,
+    "notes": "延长保温至45分钟"
+  }'
+```
+
+---
+
+### 6. 删除规划
+
+`DELETE /firing-plans/:id`
+
+```bash
+curl -X DELETE http://localhost:3033/firing-plans/FP-TEST-001
+```
+
+---
+
+### 7. 将规划应用为新试片
+
+`POST /firing-plans/:id/apply`
+
+根据规划创建一条新的试片记录，自动填入 `firingCurve`、`peakTemp`、`kiln` 字段，并在 `observations` 中添加来源说明。
+
+#### 请求参数
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `body` | string | ✅ | 坯体类型 |
+| `recipe` | string | ✅ | 釉方配方 |
+| `id` | string | - | 自定义试片 id |
+| `ashSource` | string | - | 灰来源 |
+| `glazeThickness` | string | - | 施釉厚度 |
+| `color` | string | - | 釉色（烧成后填） |
+| `defects` | string | - | 缺陷（烧成后填） |
+| `score` | number | - | 评分（烧成后填） |
+
+#### 示例
+
+```bash
+curl -X POST http://localhost:3033/firing-plans/FP-TEST-001/apply \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": "AG-099",
+    "body": "粗陶坯",
+    "recipe": "松灰42 长石35 石英18 红土5",
+    "ashSource": "南山松灰",
+    "glazeThickness": "0.8mm"
+  }'
+```
+
+#### 返回
+
+```jsonc
+{
+  "tile": {
+    "id": "AG-099",
+    "body": "粗陶坯",
+    "recipe": "松灰42 长石35 石英18 红土5",
+    "ashSource": "南山松灰",
+    "glazeThickness": "0.8mm",
+    "kiln": "K-2",
+    "firingCurve": [ ... ],
+    "peakTemp": 1240,
+    "color": "",
+    "defects": "",
+    "score": 0,
+    "observations": [
+      {
+        "at": "2026-06-20",
+        "note": "本试片基于烧成规划 FP-TEST-001 (K-2标准1240℃松灰釉) 创建..."
+      }
+    ],
+    "fromPlanId": "FP-TEST-001"
+  },
+  "planId": "FP-TEST-001"
+}
+```
+
+---
+
+### 烧成规划草稿字段定义
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | string | 规划唯一编号 |
+| name | string | 规划名称 |
+| status | string | `draft` 草稿 / `applied` 已应用 |
+| kiln | string | 窑炉编号 |
+| peakTemp | number | 峰值温度 |
+| holdMinutes | number | 保温时间（分钟） |
+| heatingStages | array | 输入的升温阶段配置 |
+| firingCurve | array | 规范化后烧成曲线 `[{temp, minutes}]` |
+| totalDurationMinutes | number | 总烧成时间（分钟） |
+| heatingRates | array | 各阶段升温速率 `[{from, to, rateCelsiusPerHour}]` |
+| risks | array | 风险列表 `[{level, code, message}]` |
+| riskCount | object | 风险统计 `{danger, warning, info}` |
+| similarCurves | array | 历史相似曲线 Top3 |
+| notes | string | 备注 |
+| createdAt | string | 创建日期 |
+| updatedAt | string | 更新日期 |
+| appliedTileId | string | 已应用时关联的试片 id |
