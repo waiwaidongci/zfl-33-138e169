@@ -148,7 +148,7 @@ export function validate(db) {
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | `/` | 服务信息与端点列表 |
-| GET | `/tiles?ashSource=&minTemp=&recipeVersionId=` | 查询试片列表 |
+| GET | `/tiles?ashSource=&minTemp=&maxTemp=&kiln=&minScore=&maxScore=&hasDefects=&sort=&recipeVersionId=&status=&batchId=` | 查询试片列表 |
 | POST | `/tiles` | 新增单个试片 |
 | GET | `/tiles/:id` | 查询单个试片 |
 | POST | `/tiles/:id/observations` | 添加观察记录 |
@@ -171,6 +171,33 @@ export function validate(db) {
 | PATCH | `/batches/:id/status` | 推进批次状态 |
 | POST | `/batches/:id/observations` | 添加批次观察记录 |
 | GET | `/batches/:id/summary` | 生成批次结果摘要 |
+
+---
+
+### 试片列表查询参数
+
+`GET /tiles` 支持以下查询参数，可自由组合：
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `ashSource` | string | 灰来源模糊匹配（包含即可） |
+| `minTemp` | number | 峰值温度下限（≥） |
+| `maxTemp` | number | 峰值温度上限（≤） |
+| `kiln` | string | 窑号精确匹配 |
+| `minScore` | number | 评分下限（≥） |
+| `maxScore` | number | 评分上限（≤） |
+| `hasDefects` | string | 是否有缺陷：`true` 仅返回有缺陷的试片，`false` 仅返回无缺陷的试片，不传则不过滤 |
+| `sort` | string | 排序字段，支持 `score`、`peakTemp`、`id`；字段名前加 `-` 表示降序，如 `-score` |
+| `recipeVersionId` | string | 配方版本 id 精确匹配 |
+| `status` | string | 试片状态精确匹配 |
+| `batchId` | string | 所属批次 id 精确匹配 |
+
+示例：
+
+```bash
+# 查询 K-2 窑、温度 1200~1260℃、评分 70~90 之间、有缺陷的试片，按评分降序
+curl "http://localhost:3033/tiles?kiln=K-2&minTemp=1200&maxTemp=1260&minScore=70&maxScore=90&hasDefects=true&sort=-score"
+```
 
 ---
 

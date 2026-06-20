@@ -666,6 +666,129 @@ async function test8_api_routes_and_filters() {
   assertEq(notFoundResult.status, 404, "不存在的试片返回 404");
 }
 
+async function test10_tile_list_advanced_filters() {
+  console.log("\nTest 10: 试片列表高级组合筛选与排序");
+
+  await setupMigratedDb();
+
+  const { loadDb, saveDb, getCollections } = await import("../lib/db.js");
+  const { handleListTiles } = await import("../lib/routes.js");
+
+  const db = await loadDb();
+  const coll = getCollections(db);
+
+  const tiles = [
+    { id: "AG-ADV-001", body: "粗陶坯", recipe: "松灰42 长石35", ashSource: "南山松灰", kiln: "K-1", peakTemp: 1200, score: 60, defects: "", defectTags: [], observations: [] },
+    { id: "AG-ADV-002", body: "粗陶坯", recipe: "稻灰40 长石40", ashSource: "东北稻灰", kiln: "K-2", peakTemp: 1240, score: 75, defects: "边缘流釉", defectTags: [{ name: "流釉", severity: "mild", note: "边缘" }], observations: [] },
+    { id: "AG-ADV-003", body: "细瓷坯", recipe: "竹灰42 长石35", ashSource: "莫干山竹灰", kiln: "K-2", peakTemp: 1260, score: 88, defects: "针孔", defectTags: [{ name: "针孔", severity: "moderate", note: "" }], observations: [] },
+    { id: "AG-ADV-004", body: "细瓷坯", recipe: "木灰50 长石30", ashSource: "果木灰", kiln: "K-3", peakTemp: 1300, score: 92, defects: "", defectTags: [], observations: [] },
+    { id: "AG-ADV-005", body: "粗陶坯", recipe: "松灰42 长石35", ashSource: "南山松灰", kiln: "K-2", peakTemp: 1250, score: 45, defects: "缩釉开裂", defectTags: [{ name: "缩釉", severity: "severe", note: "" }, { name: "开裂", severity: "severe", note: "" }], observations: [] },
+    { id: "AG-ADV-006", body: "细瓷坯", recipe: "稻灰40 长石40", ashSource: "东北稻灰", kiln: "K-1", peakTemp: 1180, score: 30, defects: "", defectTags: [], observations: [] }
+  ];
+
+  const { TILE_STATUSES } = await import("../lib/tile-status-machine.js");
+  for (const t of tiles) {
+    coll.tiles.push({
+      ...t,
+      status: TILE_STATUSES.DRAFT,
+      statusHistory: [],
+      batchId: null,
+      inventoryDeducted: false
+    });
+  }
+  await saveDb(db);
+
+  const urlKiln = new URL("http://localhost/tiles?kiln=K-2");
+  const resKiln = await handleListTiles(urlKiln, db);
+  assertEq(resKiln.status, 200, "kiln 过滤返回 200");
+  assert(resKiln.data.every(t => t.kiln === "K-2"), "kiln=K-2 只返回 K-2 窑的试片");
+  assert(resKiln.data.some(t => t.id.startsWith("AG-ADV-")), "kiln=K-2 包含测试数据");
+  const advK2Count = resKiln.data.filter(t => t.id.startsWith("AG-ADV-")).length;
+  assertEq(advK2Count, 3, "K-2 窑测试数据有 3 条");
+
+  const urlMaxTemp = new URL("http://localhost/tiles?maxTemp=1250");
+  const resMaxTemp = await handleListTiles(urlMaxTemp, db);
+  assert(resMaxTemp.data.every(t => Number(t.peakTemp) <= 1250), "maxTemp=1250 过滤正确");
+  assert(resMaxTemp.data.length >= 3, "maxTemp=1250 至少返回 3 条（含种子数据）");
+
+  const urlMinScore = new URL("http://localhost/tiles?minScore=70");
+  const resMinScore = await handleListTiles(urlMinScore, db);
+  assert(resMinScore.data.every(t => Number(t.score) >= 70), "minScore=70 过滤正确");
+
+  const urlMaxScore = new URL("http://localhost/tiles?maxScore=60");
+  const resMaxScore = await handleListTiles(urlMaxScore, db);
+  assert(resMaxScore.data.every(t => Number(t.score) <= 60), "maxScore=60 过滤正确");
+
+  const urlHasDefectsTrue = new URL("http://localhost/tiles?hasDefects=true");
+  const resHasDefectsTrue = await handleListTiles(urlHasDefectsTrue, db);
+  assert(resHasDefectsTrue.data.every(t =>
+    (Array.isArray(t.defectTags) && t.defectTags.length > 0) || (typeof t.defects === "string" && t.defects.trim().length > 0)
+  ), "hasDefects=true 只返回有缺陷的试片");
+
+  const urlHasDefectsFalse = new URL("http://localhost/tiles?hasDefects=false");
+  const resHasDefectsFalse = await handleListTiles(urlHasDefectsFalse, db);
+  assert(resHasDefectsFalse.data.every(t =>
+    !(Array.isArray(t.defectTags) && t.defectTags.length > 0) && !(typeof t.defects === "string" && t.defects.trim().length > 0)
+  ), "hasDefects=false 只返回无缺陷的试片");
+
+  const urlCombined = new URL("http://localhost/tiles?kiln=K-2&minTemp=1230&maxTemp=1260&minScore=70&maxScore=90&hasDefects=true");
+  const resCombined = await handleListTiles(urlCombined, db);
+  assertEq(resCombined.status, 200, "多条件组合筛选返回 200");
+  assert(resCombined.data.every(t => t.kiln === "K-2"), "组合筛选：kiln=K-2");
+  assert(resCombined.data.every(t => Number(t.peakTemp) >= 1230), "组合筛选：minTemp=1230");
+  assert(resCombined.data.every(t => Number(t.peakTemp) <= 1260), "组合筛选：maxTemp=1260");
+  assert(resCombined.data.every(t => Number(t.score) >= 70), "组合筛选：minScore=70");
+  assert(resCombined.data.every(t => Number(t.score) <= 90), "组合筛选：maxScore=90");
+  assert(resCombined.data.every(t =>
+    (Array.isArray(t.defectTags) && t.defectTags.length > 0) || (typeof t.defects === "string" && t.defects.trim().length > 0)
+  ), "组合筛选：hasDefects=true");
+
+  const urlSortScoreDesc = new URL("http://localhost/tiles?sort=-score");
+  const resSortDesc = await handleListTiles(urlSortScoreDesc, db);
+  const advDesc = resSortDesc.data.filter(t => t.id.startsWith("AG-ADV-"));
+  const scoresDesc = advDesc.map(t => Number(t.score));
+  for (let i = 1; i < scoresDesc.length; i++) {
+    assert(scoresDesc[i - 1] >= scoresDesc[i], `sort=-score 降序：${scoresDesc[i - 1]} >= ${scoresDesc[i]}`);
+  }
+
+  const urlSortScoreAsc = new URL("http://localhost/tiles?sort=score");
+  const resSortAsc = await handleListTiles(urlSortScoreAsc, db);
+  const advAsc = resSortAsc.data.filter(t => t.id.startsWith("AG-ADV-"));
+  const scoresAsc = advAsc.map(t => Number(t.score));
+  for (let i = 1; i < scoresAsc.length; i++) {
+    assert(scoresAsc[i - 1] <= scoresAsc[i], `sort=score 升序：${scoresAsc[i - 1]} <= ${scoresAsc[i]}`);
+  }
+
+  const urlSortPeakTemp = new URL("http://localhost/tiles?sort=-peakTemp");
+  const resSortPeak = await handleListTiles(urlSortPeakTemp, db);
+  const advPeak = resSortPeak.data.filter(t => t.id.startsWith("AG-ADV-"));
+  const tempsPeak = advPeak.map(t => Number(t.peakTemp));
+  for (let i = 1; i < tempsPeak.length; i++) {
+    assert(tempsPeak[i - 1] >= tempsPeak[i], `sort=-peakTemp 降序：${tempsPeak[i - 1]} >= ${tempsPeak[i]}`);
+  }
+
+  const urlComboSort = new URL("http://localhost/tiles?kiln=K-2&minScore=40&sort=-score");
+  const resComboSort = await handleListTiles(urlComboSort, db);
+  assertEq(resComboSort.status, 200, "组合筛选+排序返回 200");
+  assert(resComboSort.data.every(t => t.kiln === "K-2"), "组合+排序：kiln=K-2");
+  assert(resComboSort.data.every(t => Number(t.score) >= 40), "组合+排序：minScore=40");
+  const comboScores = resComboSort.data.map(t => Number(t.score));
+  for (let i = 1; i < comboScores.length; i++) {
+    assert(comboScores[i - 1] >= comboScores[i], `组合+排序：score 降序 ${comboScores[i - 1]} >= ${comboScores[i]}`);
+  }
+
+  const urlInvalidSort = new URL("http://localhost/tiles?sort=invalidField");
+  const resInvalidSort = await handleListTiles(urlInvalidSort, db);
+  assertEq(resInvalidSort.status, 200, "不支持的 sort 字段仍返回 200（忽略排序）");
+  assert(Array.isArray(resInvalidSort.data), "不支持的 sort 字段返回数组");
+
+  const firstResult = resComboSort.data[0];
+  assert(firstResult.id !== undefined, "返回结构兼容：包含 id");
+  assert(firstResult.kiln !== undefined, "返回结构兼容：包含 kiln");
+  assert(firstResult.score !== undefined, "返回结构兼容：包含 score");
+  assert(firstResult.peakTemp !== undefined, "返回结构兼容：包含 peakTemp");
+}
+
 async function test9_legacy_entry_guards() {
   console.log("\nTest 9: 旧入口权限守卫验证");
 
@@ -833,6 +956,7 @@ async function run() {
     await test7_batch_status_transition();
     await test8_api_routes_and_filters();
     await test9_legacy_entry_guards();
+    await test10_tile_list_advanced_filters();
 
     console.log(`\n========== Results: ${passed} passed, ${failed} failed ==========`);
     if (failed > 0) {
