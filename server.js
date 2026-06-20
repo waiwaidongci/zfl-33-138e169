@@ -18,6 +18,19 @@ import {
   handleDeletePlan,
   handleApplyPlan
 } from "./lib/routes.js";
+import {
+  handleListRecipes,
+  handleCreateRecipe,
+  handleGetRecipe,
+  handleUpdateRecipe,
+  handleDeleteRecipe,
+  handleListVersions,
+  handleCreateVersion,
+  handleGetVersion,
+  handleCopyVersion,
+  handleGetRecipeReport,
+  handleGetVersionReport
+} from "./lib/recipe-routes.js";
 
 const port = Number(process.env.PORT || 3033);
 
@@ -111,6 +124,68 @@ const server = http.createServer(async (req, res) => {
     }
     if (planMatch && req.method === "DELETE") {
       const r = await handleDeletePlan(planMatch[1], db);
+      return send(res, r.status, r.data);
+    }
+
+    if (req.method === "GET" && url.pathname === "/recipes") {
+      const r = await handleListRecipes(url, db);
+      return send(res, r.status, r.data);
+    }
+
+    if (req.method === "POST" && url.pathname === "/recipes") {
+      const input = await readJsonBody(req);
+      const r = await handleCreateRecipe(input, db);
+      return send(res, r.status, r.data);
+    }
+
+    const recipeVersionsReportMatch = url.pathname.match(/^\/recipes\/([^/]+)\/versions\/([^/]+)\/report$/);
+    if (recipeVersionsReportMatch && req.method === "GET") {
+      const r = await handleGetVersionReport(recipeVersionsReportMatch[1], recipeVersionsReportMatch[2], db);
+      return send(res, r.status, r.data);
+    }
+
+    const recipeVersionsCopyMatch = url.pathname.match(/^\/recipes\/([^/]+)\/versions\/([^/]+)\/copy$/);
+    if (recipeVersionsCopyMatch && req.method === "POST") {
+      const input = await readJsonBody(req);
+      const r = await handleCopyVersion(recipeVersionsCopyMatch[1], recipeVersionsCopyMatch[2], input, db);
+      return send(res, r.status, r.data);
+    }
+
+    const recipeVersionsMatch = url.pathname.match(/^\/recipes\/([^/]+)\/versions\/([^/]+)$/);
+    if (recipeVersionsMatch && req.method === "GET") {
+      const r = await handleGetVersion(recipeVersionsMatch[1], recipeVersionsMatch[2], db);
+      return send(res, r.status, r.data);
+    }
+
+    const recipeReportMatch = url.pathname.match(/^\/recipes\/([^/]+)\/report$/);
+    if (recipeReportMatch && req.method === "GET") {
+      const r = await handleGetRecipeReport(recipeReportMatch[1], db);
+      return send(res, r.status, r.data);
+    }
+
+    const recipeVersionsListMatch = url.pathname.match(/^\/recipes\/([^/]+)\/versions$/);
+    if (recipeVersionsListMatch && req.method === "GET") {
+      const r = await handleListVersions(recipeVersionsListMatch[1], db);
+      return send(res, r.status, r.data);
+    }
+    if (recipeVersionsListMatch && req.method === "POST") {
+      const input = await readJsonBody(req);
+      const r = await handleCreateVersion(recipeVersionsListMatch[1], input, db);
+      return send(res, r.status, r.data);
+    }
+
+    const recipeMatch = url.pathname.match(/^\/recipes\/([^/]+)$/);
+    if (recipeMatch && req.method === "GET") {
+      const r = await handleGetRecipe(recipeMatch[1], db);
+      return send(res, r.status, r.data);
+    }
+    if (recipeMatch && req.method === "PATCH") {
+      const input = await readJsonBody(req);
+      const r = await handleUpdateRecipe(recipeMatch[1], input, db);
+      return send(res, r.status, r.data);
+    }
+    if (recipeMatch && req.method === "DELETE") {
+      const r = await handleDeleteRecipe(recipeMatch[1], db);
       return send(res, r.status, r.data);
     }
 

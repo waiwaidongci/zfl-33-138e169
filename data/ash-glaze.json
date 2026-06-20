@@ -38,8 +38,48 @@
           "at": "2026-06-10",
           "note": "还原气氛后半段偏强"
         }
-      ]
+      ],
+      "recipeVersionId": "RCV-0001"
     }
   ],
-  "firingPlans": []
+  "firingPlans": [],
+  "recipes": [
+    {
+      "id": "RC-001",
+      "name": "南山松灰配方",
+      "description": "从历史试片数据自动迁移生成",
+      "createdAt": "2026-06-20",
+      "updatedAt": "2026-06-20",
+      "migratedFromTiles": true
+    }
+  ],
+  "recipeVersions": [
+    {
+      "id": "RCV-0001",
+      "recipeId": "RC-001",
+      "version": 1,
+      "text": "松灰42 长石35 石英18 红土5",
+      "ingredients": [
+        {
+          "name": "松灰",
+          "percentage": 42
+        },
+        {
+          "name": "长石",
+          "percentage": 35
+        },
+        {
+          "name": "石英",
+          "percentage": 18
+        },
+        {
+          "name": "红土",
+          "percentage": 5
+        }
+      ],
+      "note": "初始版本，从历史试片数据迁移生成",
+      "createdAt": "2026-06-20",
+      "parentVersionId": null
+    }
+  ]
 }
