@@ -636,6 +636,135 @@ curl -X POST http://localhost:3033/firing-plans/FP-TEST-001/apply \
 
 ---
 
+### 8. 将规划应用为实验批次（applyMode=batch）
+
+`POST /firing-plans/:id/apply` 支持 `applyMode=batch` 参数，可一键生成实验批次，自动创建批次、生成或关联试片，并将所有试片推进到待烧成状态。
+
+#### 请求参数
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `applyMode` | string | ✅ | 必须为 `"batch"` |
+| `batchName` | string | ✅ | 批次名称 |
+| `plannedDate` | string | ✅ | 计划烧成日期，格式 `YYYY-MM-DD` |
+| `targetAtmosphere` | string | ✅ | 目标气氛，如 `"氧化"`、`"还原"` |
+| `tiles` | array | ✅ | 试片列表，每个元素为试片数据对象 |
+| `operator` | string | - | 操作人，默认 `"system"` |
+
+**`tiles` 数组元素结构**：
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `tileId` | string | - | 关联现有试片的 id（与 `body`/`recipe` 二选一） |
+| `body` | string | - | 坯体类型（新建试片时必填） |
+| `recipe` | string | - | 釉方配方（新建试片时必填） |
+| `id` | string | - | 自定义试片 id（新建时可选） |
+| `ashSource` | string | - | 灰来源 |
+| `glazeThickness` | string | - | 施釉厚度 |
+| `materialBatchRefs` | array | - | 原料批次引用，用于库存扣减 `[{ingredientName, batchNo}]` |
+| `batchWeight` | number | - | 总重量（与 `materialBatchRefs` 同时提供时触发库存扣减） |
+
+> **提示**：`tiles` 数组中的每个元素可以是：
+> 1. **新建试片**：提供 `body`、`recipe` 等字段，系统自动创建
+> 2. **关联现有试片**：提供 `tileId`，系统将已有的草稿状态试片加入批次
+
+#### 示例：一键生成批次
+
+```bash
+curl -X POST http://localhost:3033/firing-plans/FP-TEST-001/apply \
+  -H "Content-Type: application/json" \
+  -d '{
+    "applyMode": "batch",
+    "batchName": "K-2还原气氛松灰釉实验批次",
+    "plannedDate": "2026-06-25",
+    "targetAtmosphere": "还原",
+    "operator": "lab_tech",
+    "tiles": [
+      {
+        "body": "粗陶坯",
+        "recipe": "松灰42 长石35 石英18 红土5",
+        "ashSource": "南山松灰",
+        "glazeThickness": "0.8mm",
+        "materialBatchRefs": [
+          { "ingredientName": "松灰", "batchNo": "SG-2026-001" },
+          { "ingredientName": "长石", "batchNo": "CS-2026-001" },
+          { "ingredientName": "石英", "batchNo": "SY-2026-001" },
+          { "ingredientName": "红土", "batchNo": "HT-2026-001" }
+        ],
+        "batchWeight": 10
+      },
+      {
+        "tileId": "AG-EXISTING-001",
+        "materialBatchRefs": [
+          { "ingredientName": "松灰", "batchNo": "SG-2026-001" },
+          { "ingredientName": "长石", "batchNo": "CS-2026-001" },
+          { "ingredientName": "石英", "batchNo": "SY-2026-001" },
+          { "ingredientName": "红土", "batchNo": "HT-2026-001" }
+        ],
+        "batchWeight": 8
+      }
+    ]
+  }'
+```
+
+#### 成功返回
+
+```jsonc
+{
+  "batch": {
+    "id": "BATCH-001",
+    "name": "K-2还原气氛松灰釉实验批次",
+    "kiln": "K-2",
+    "plannedDate": "2026-06-25",
+    "targetAtmosphere": "还原",
+    "tileIds": ["AG-1234567890000-0", "AG-EXISTING-001"],
+    "status": "planned",
+    "observations": [...],
+    "createdAt": "2026-06-21",
+    "updatedAt": "2026-06-21"
+  },
+  "planId": "FP-TEST-001",
+  "tiles": [
+    { /* 试片1详情 */ },
+    { /* 试片2详情 */ }
+  ],
+  "transitions": [
+    {
+      "id": "AG-1234567890000-0",
+      "from": "draft",
+      "to": "pending_firing",
+      "statusRecord": { /* 状态变更记录 */ }
+    }
+  ],
+  "stockDeductions": [
+    {
+      "tileId": "AG-1234567890000-0",
+      "deductions": [
+        { "stockId": "MAT-001", "ingredientName": "松灰", "batchNo": "SG-2026-001", "requiredQuantity": 4.2, "unit": "kg" }
+      ]
+    }
+  ]
+}
+```
+
+#### 错误处理
+
+| HTTP 状态码 | error 字段 | 触发条件 |
+|-------------|------------|----------|
+| 400 | `missing_required` | 缺少必填字段 |
+| 400 | `tile_validation_failed` | 一个或多个试片验证失败（详情见 errors 数组） |
+| 409 | `plan_already_applied` | 该规划已应用于某个批次，不可重复应用 |
+| 409 | `insufficient_stock` | 某个试片的原料库存不足 |
+| 409 | `status_transition_failed` | 某个试片状态推进失败 |
+
+**重复应用防护**：每个烧成规划只能应用为一个批次，已应用的规划会返回 409 错误。
+
+**状态校验**：关联现有试片时，仅草稿（`draft`）状态的试片可加入批次。
+
+**库存扣减**：提供 `materialBatchRefs` 和 `batchWeight` 时，系统会自动校验库存并扣减。
+
+---
+
 ### 烧成规划草稿字段定义
 
 | 字段 | 类型 | 说明 |
@@ -656,7 +785,9 @@ curl -X POST http://localhost:3033/firing-plans/FP-TEST-001/apply \
 | notes | string | 备注 |
 | createdAt | string | 创建日期 |
 | updatedAt | string | 更新日期 |
-| appliedTileId | string | 已应用时关联的试片 id |
+| appliedTileId | string | 单试片应用时关联的试片 id |
+| appliedBatchId | string | 批次应用时关联的批次 id |
+| appliedTileIds | array | 批次应用时关联的所有试片 id 列表 |
 
 ---
 
