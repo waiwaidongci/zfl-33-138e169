@@ -49,21 +49,6 @@
       ]
     },
     {
-      "id": "AG-1781948276375",
-      "body": "粗陶坯",
-      "recipe": "松灰42 长石35 石英18 红土5",
-      "recipeVersionId": "RCV-0001",
-      "ashSource": "南山松灰",
-      "firingCurve": [],
-      "peakTemp": 0,
-      "color": "",
-      "defects": "",
-      "score": 0,
-      "observations": [],
-      "batchWeight": 10,
-      "defectTags": []
-    },
-    {
       "id": "AG-002",
       "body": "粗陶坯",
       "recipe": "松灰45 长石30 石英20 高岭5",
