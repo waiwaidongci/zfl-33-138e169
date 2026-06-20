@@ -9,6 +9,7 @@ const testDir = join(projectRoot, "tests", "tmp");
 const testDataDir = join(testDir, "data");
 const testDbPath = join(testDataDir, "ash-glaze.json");
 const testBackupDir = join(testDataDir, "backups");
+const testMigrationsDir = join(testDir, "migrations");
 
 process.env.ASH_GLAZE_DATA_DIR = testDataDir;
 process.env.ASH_GLAZE_DB_PATH = testDbPath;
@@ -60,6 +61,7 @@ const legacySample = {
 async function setupTestEnv() {
   await rm(testDir, { recursive: true, force: true });
   await mkdir(testBackupDir, { recursive: true });
+  delete process.env.ASH_GLAZE_MIGRATIONS_DIR;
   await writeFile(testDbPath, JSON.stringify(legacySample, null, 2));
 }
 
@@ -191,47 +193,43 @@ async function test5_migrationFailurePreservesOriginal() {
   const beforeContent = await readFile(testDbPath, "utf8");
   const beforeHash = JSON.stringify(JSON.parse(beforeContent));
 
-  const { migrateToLatest, loadMigrationScripts } = await import("../lib/schema-migration.js");
-  const { loadDb, getSchemaVersion, getCollections, createBackup, restoreFromBackup, listBackups } = await import("../lib/db.js");
+  const { migrateToLatest } = await import("../lib/schema-migration.js");
+  const { loadDb, getSchemaVersion, listBackups } = await import("../lib/db.js");
 
   const dbBefore = await loadDb();
   assertEq(getSchemaVersion(dbBefore), 0, "迁移前版本为 0");
 
-  const backupPath = await createBackup("test-failure-scenario");
-  assert(backupPath !== null, "已创建迁移前备份");
+  await rm(testMigrationsDir, { recursive: true, force: true });
+  await mkdir(testMigrationsDir, { recursive: true });
+  await writeFile(join(testMigrationsDir, "001-failing.js"), `
+export const version = 1;
+export const name = "simulated-failure";
+export const description = "模拟失败的迁移脚本";
 
-  const coll = getCollections(dbBefore);
-  coll.tiles[0].body = "THIS_IS_DIRTY_DATA_THAT_SHOULD_NEVER_BE_SAVED";
-  coll.tiles.push({ id: "INVALID_TILE_SHOULD_BE_ROLLED_BACK", body: "bad" });
+export function up(db) {
+  const result = db._helpers.toNewFormat(db);
+  result.collections.tiles[0].body = "THIS_IS_DIRTY_DATA_THAT_SHOULD_NEVER_BE_SAVED";
+  result.collections.tiles.push({ id: "INVALID_TILE_SHOULD_BE_ROLLED_BACK", body: "bad" });
+  throw new Error("simulated migration failure - should trigger rollback");
+}
 
-  const originalScripts = await loadMigrationScripts();
-  const badScript = {
-    version: 999,
-    name: "simulated-failure",
-    description: "模拟失败的迁移脚本",
-    up: () => {
-      throw new Error("simulated migration failure - should trigger rollback");
-    },
-    down: (db) => ({ result: db }),
-    validate: () => ({ valid: true, errors: [] })
-  };
+export function down(db) {
+  return { result: db };
+}
 
-  const beforeWriteContent = await readFile(testDbPath, "utf8");
+export function validate() {
+  return { valid: true, errors: [] };
+}
+`);
 
-  const simulatedResult = {
-    success: false,
-    error: "simulated migration failure - should trigger rollback",
-    migrations: [],
-    backupPath,
-    restoredFromBackup: true
-  };
+  process.env.ASH_GLAZE_MIGRATIONS_DIR = testMigrationsDir;
+  const failedResult = await migrateToLatest({ autoBackup: true });
+  delete process.env.ASH_GLAZE_MIGRATIONS_DIR;
 
-  assert(simulatedResult.success === false, "模拟迁移失败返回 success=false");
-  assert(simulatedResult.error.includes("simulated migration failure"), "错误信息包含失败原因");
-  assert(simulatedResult.backupPath !== null, "失败前创建了备份");
-  assert(simulatedResult.restoredFromBackup === true, "标记为已从备份恢复");
-
-  await restoreFromBackup(backupPath);
+  assert(failedResult.success === false, "真实失败迁移返回 success=false");
+  assert(failedResult.error.includes("simulated migration failure"), "错误信息包含失败原因");
+  assert(failedResult.backupPath !== null, "失败前创建了备份");
+  assert(failedResult.restoredFromBackup === true, "标记为已从备份恢复");
 
   const afterContent = await readFile(testDbPath, "utf8");
   const afterHash = JSON.stringify(JSON.parse(afterContent));
@@ -239,10 +237,6 @@ async function test5_migrationFailurePreservesOriginal() {
 
   const dbAfter = await loadDb();
   assertEq(getSchemaVersion(dbAfter), 0, "恢复后版本仍为 0");
-
-  const collAfter = getCollections(dbAfter);
-  assert(collAfter.tiles[0].body !== "THIS_IS_DIRTY_DATA_THAT_SHOULD_NEVER_BE_SAVED", "未提交的脏修改已被回滚");
-  assertEq(collAfter.tiles.length, 2, "未提交的新增记录已被回滚");
 
   const realUpResult = await migrateToLatest({ autoBackup: true });
   assert(realUpResult.success === true, "正常迁移可以成功执行");
