@@ -5,8 +5,8 @@
       "version": 1,
       "name": "introduce-schema-version",
       "description": "将单一 JSON 数据文件迁移为带 schemaVersion 的多集合数据格式，引入 collections 和 migrations 元数据字段",
-      "appliedAt": "2026-06-20T13:00:13.852Z",
-      "backupPath": "/Users/ali/Desktop/zfl  new solo coder/zfl-33/data/backups/ash-glaze_pre-migrate-v0_20260620-210013.bak.json"
+      "appliedAt": "2026-06-20T12:56:53.500Z",
+      "backupPath": "/Users/ali/Desktop/zfl  new solo coder/zfl-33/data/backups/ash-glaze_pre-migrate-v0_20260620-205653.bak.json"
     }
   ],
   "collections": {

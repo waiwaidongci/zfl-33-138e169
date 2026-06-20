@@ -1,5 +1,6 @@
 import http from "node:http";
 import { loadDb } from "./lib/db.js";
+import { autoMigrateOnStartup } from "./lib/schema-migration.js";
 import {
   routesInfo,
   readJsonBody,
@@ -414,4 +415,25 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(port, () => console.log(`Ash glaze lab API listening on http://localhost:${port}`));
+async function startServer() {
+  const migration = await autoMigrateOnStartup();
+  if (migration.needed) {
+    const r = migration.result;
+    if (r.success) {
+      console.log(`[startup] Schema migrated from v${r.fromVersion} to v${r.toVersion} (${r.migrations.length} migration(s) applied)`);
+      if (r.backupPath) console.log(`[startup] Backup created at: ${r.backupPath}`);
+    } else {
+      console.error(`[startup] Schema migration failed: ${r.error}`);
+      if (r.restoredFromBackup) console.error(`[startup] Restored from backup: ${r.backupPath}`);
+      process.exit(1);
+    }
+  } else {
+    console.log(`[startup] Schema is up to date`);
+  }
+  server.listen(port, () => console.log(`Ash glaze lab API listening on http://localhost:${port}`));
+}
+
+startServer().catch(err => {
+  console.error(`[startup] Failed to start server: ${err.message}`);
+  process.exit(1);
+});

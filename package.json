@@ -4,6 +4,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "migrate:status": "node scripts/migrate-cli.js status",
+    "migrate:up": "node scripts/migrate-cli.js up",
+    "migrate:rollback": "node scripts/migrate-cli.js rollback",
+    "migrate:backups": "node scripts/migrate-cli.js list-backups",
+    "migrate:restore": "node scripts/migrate-cli.js restore",
+    "test:migrate": "node tests/migration.test.js"
   }
 }

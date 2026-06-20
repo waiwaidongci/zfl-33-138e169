@@ -8,6 +8,141 @@ npm start
 
 默认端口`3033`。数据保存在`data/ash-glaze.json`。
 
+---
+
+## Schema 迁移系统
+
+### 概述
+
+系统内置了可回滚的数据迁移引擎，将单一 JSON 数据文件演进为带 `schemaVersion` 的多集合格式，支持 `tiles`、`recipes`、`batches`、`materials` 等集合逐步迁移。
+
+### 数据格式演进
+
+**旧格式 (v0, legacy)**：所有集合平铺在 JSON 根节点
+
+```json
+{
+  "tiles": [...],
+  "firingPlans": [...],
+  "recipes": [...]
+}
+```
+
+**新格式 (v1+)**：带 schemaVersion 和元数据
+
+```json
+{
+  "schemaVersion": 1,
+  "migrations": [
+    { "version": 1, "name": "introduce-schema-version", "appliedAt": "2026-..." }
+  ],
+  "collections": {
+    "tiles": [...],
+    "firingPlans": [...],
+    "recipes": [...],
+    "recipeVersions": [...],
+    "batches": [...],
+    "materialStocks": [...]
+  }
+}
+```
+
+### 启动自动迁移
+
+服务启动时会自动检测数据文件版本，若存在待执行迁移则自动执行：
+
+```bash
+$ npm start
+
+[startup] Schema migrated from v0 to v1 (1 migration(s) applied)
+[startup] Backup created at: /path/to/data/backups/ash-glaze_pre-migrate-v0_....bak.json
+Ash glaze lab API listening on http://localhost:3033
+```
+
+迁移失败时会自动从备份恢复，不会破坏原文件。
+
+### 命令行工具
+
+| 命令 | 说明 |
+|------|------|
+| `npm run migrate:status` | 查看当前版本、已应用/待执行迁移、备份列表 |
+| `npm run migrate:up` | 执行所有待执行迁移 |
+| `npm run migrate:rollback` | 回滚最近一次迁移 |
+| `npm run migrate:backups` | 列出所有备份文件 |
+| `npm run migrate:restore -- <filename>` | 从指定备份恢复 |
+| `npm run test:migrate` | 运行迁移系统回归测试 |
+
+也可直接调用 CLI：
+
+```bash
+# 查看状态
+node scripts/migrate-cli.js status
+
+# 执行迁移
+node scripts/migrate-cli.js up
+
+# 回滚
+node scripts/migrate-cli.js rollback
+
+# 查看备份
+node scripts/migrate-cli.js list-backups
+
+# 从备份恢复
+node scripts/migrate-cli.js restore ash-glaze_pre-migrate_20260101-120000.bak.json
+```
+
+### 备份机制
+
+- 迁移前自动创建备份，格式：`ash-glaze_<label>_YYYYMMDD-HHMMSS.bak.json`
+- 备份目录：`data/backups/`
+- 迁移过程中任何一步失败，自动从备份恢复原文件
+- 回滚前同样会先创建备份
+
+### 添加新迁移
+
+在 `lib/migrations/` 目录下新建脚本文件，命名格式为 `NNN-name.js`（NNN 为三位数字版本号）：
+
+```javascript
+// lib/migrations/002-example-migration.js
+export const version = 2;
+export const name = "example-migration";
+export const description = "迁移说明";
+
+export function up(db) {
+  // db._helpers 提供工具函数：isNewFormat, toNewFormat, toLegacyFormat, getCollections, getSchemaVersion
+  const { getCollections } = db._helpers;
+  const coll = getCollections(db);
+  // 数据转换逻辑...
+  return {
+    migrated: true,
+    collectionsCount: { tiles: coll.tiles.length },
+    result: db  // 返回转换后的 db 对象
+  };
+}
+
+export function down(db) {
+  // 反向转换
+  return { rolledBack: true, result: db };
+}
+
+export function validate(db) {
+  const errors = [];
+  // 校验逻辑
+  return { valid: errors.length === 0, errors };
+}
+```
+
+### 架构说明
+
+核心模块：
+
+- [lib/db.js](file:///Users/ali/Desktop/zfl%20%20new%20solo%20coder/zfl-33/lib/db.js) — 存储层，新旧格式双兼容，备份恢复
+- [lib/schema-migration.js](file:///Users/ali/Desktop/zfl%20%20new%20solo%20coder/zfl-33/lib/schema-migration.js) — 迁移引擎，加载脚本、执行 up/down、出错回滚
+- [lib/migrations/](file:///Users/ali/Desktop/zfl%20%20new%20solo%20coder/zfl-33/lib/migrations) — 各版本迁移脚本
+- [scripts/migrate-cli.js](file:///Users/ali/Desktop/zfl%20%20new%20solo%20coder/zfl-33/scripts/migrate-cli.js) — 命令行工具
+
+上层业务代码通过 `getCollections(db)` 统一访问集合数据，新旧格式透明兼容。
+
 ## API 端点
 
 | 方法 | 路径 | 说明 |
