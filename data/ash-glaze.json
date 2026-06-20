@@ -45,11 +45,6 @@
           "name": "流釉",
           "severity": "mild",
           "note": ""
-        },
-        {
-          "name": "色差",
-          "severity": "severe",
-          "note": ""
         }
       ]
     },
@@ -65,32 +60,6 @@
       "defects": "",
       "score": 0,
       "observations": [],
-      "materialBatchRefs": [
-        {
-          "ingredientName": "松灰",
-          "batchNo": "SG-2026-001",
-          "deducted": 4.2,
-          "unit": "kg"
-        },
-        {
-          "ingredientName": "长石",
-          "batchNo": "CS-2026-001",
-          "deducted": 3.5,
-          "unit": "kg"
-        },
-        {
-          "ingredientName": "石英",
-          "batchNo": "SY-2026-001",
-          "deducted": 1.8,
-          "unit": "kg"
-        },
-        {
-          "ingredientName": "红土",
-          "batchNo": "HT-2026-001",
-          "deducted": 0.5,
-          "unit": "kg"
-        }
-      ],
       "batchWeight": 10,
       "defectTags": []
     },
@@ -345,34 +314,6 @@
       ],
       "recipeVersionId": "RCV-0010",
       "defectTags": []
-    },
-    {
-      "id": "AG-1781952430236",
-      "body": "细瓷坯",
-      "recipe": "松灰42 长石35 石英18 红土5",
-      "recipeVersionId": "RCV-0001",
-      "ashSource": "南山松灰",
-      "kiln": "K-1",
-      "firingCurve": [],
-      "peakTemp": 1240,
-      "color": "青白",
-      "defects": "",
-      "defectTags": [
-        {
-          "name": "针孔",
-          "severity": "mild",
-          "note": "少量"
-        },
-        {
-          "name": "色差",
-          "severity": "medium",
-          "note": ""
-        }
-      ],
-      "score": 85,
-      "observations": [],
-      "materialBatchRefs": null,
-      "batchWeight": null
     }
   ],
   "firingPlans": [],
@@ -756,7 +697,7 @@
       "id": "MAT-001",
       "name": "松灰",
       "batchNo": "SG-2026-001",
-      "quantity": 45.8,
+      "quantity": 50,
       "unit": "kg",
       "entryDate": "2026-05-15",
       "supplier": "南山灰场",
@@ -769,7 +710,7 @@
       "id": "MAT-002",
       "name": "长石",
       "batchNo": "CS-2026-001",
-      "quantity": 76.5,
+      "quantity": 80,
       "unit": "kg",
       "entryDate": "2026-05-20",
       "supplier": "景德镇矿物站",
@@ -782,7 +723,7 @@
       "id": "MAT-003",
       "name": "石英",
       "batchNo": "SY-2026-001",
-      "quantity": 58.2,
+      "quantity": 60,
       "unit": "kg",
       "entryDate": "2026-05-22",
       "supplier": "景德镇矿物站",
@@ -795,7 +736,7 @@
       "id": "MAT-004",
       "name": "红土",
       "batchNo": "HT-2026-001",
-      "quantity": 29.5,
+      "quantity": 30,
       "unit": "kg",
       "entryDate": "2026-06-01",
       "supplier": "本地采集",
