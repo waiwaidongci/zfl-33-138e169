@@ -739,11 +739,55 @@ async function test9_legacy_entry_guards() {
   const obsDraft = await handleAddObservation("AG-GUARD-DRAFT", { note: "应该被添加" }, db);
   assertEq(obsDraft.status, 201, "草稿试片通过旧入口添加观察记录成功");
 
+  const pendingFiringTile = {
+    id: "AG-GUARD-PENDING-FIRING",
+    body: "测试坯体",
+    recipe: "松灰42 长石35",
+    ashSource: "南山松灰",
+    kiln: "K-2",
+    peakTemp: 1240,
+    status: TILE_STATUSES.PENDING_FIRING,
+    statusHistory: [{ from: null, to: TILE_STATUSES.PENDING_FIRING, operator: "test", note: "", at: new Date().toISOString() }],
+    batchId: null,
+    inventoryDeducted: true,
+    score: 0,
+    defectTags: [],
+    observations: []
+  };
+  const reviewTile = {
+    id: "AG-GUARD-PENDING-REVIEW",
+    body: "测试坯体",
+    recipe: "松灰42 长石35",
+    ashSource: "南山松灰",
+    kiln: "K-2",
+    peakTemp: 1240,
+    status: TILE_STATUSES.PENDING_REVIEW,
+    statusHistory: [{ from: null, to: TILE_STATUSES.PENDING_REVIEW, operator: "test", note: "", at: new Date().toISOString() }],
+    batchId: null,
+    inventoryDeducted: true,
+    defects: "原始缺陷",
+    defectTags: [],
+    observations: [],
+    score: 80
+  };
+  coll.tiles.push(pendingFiringTile, reviewTile);
+
+  const obsWithScorePendingFiring = await handleAddObservation("AG-GUARD-PENDING-FIRING", { note: "观察记录可写但评分不可写", score: 77 }, db);
+  assertEq(obsWithScorePendingFiring.status, 400, "待烧成试片通过旧入口添加观察记录时不能顺带修改评分");
+  assertEq(coll.tiles.find(t => t.id === "AG-GUARD-PENDING-FIRING").score, 0, "待烧成旧入口拒绝后评分未变化");
+
   const defectArchived = await handleUpdateTileDefectTags("AG-GUARD-ARCHIVED", { defectTags: [{ name: "缩釉", severity: "severe" }] }, db);
   assertEq(defectArchived.status, 400, "已归档试片通过旧入口更新缺陷标签被拒绝");
 
   const defectFired = await handleUpdateTileDefectTags("AG-GUARD-FIRED", { defectTags: [{ name: "缩釉", severity: "severe" }] }, db);
   assertEq(defectFired.status, 200, "已烧成试片通过旧入口更新缺陷标签成功");
+
+  const defectTextReview = await handleUpdateTileDefectTags("AG-GUARD-PENDING-REVIEW", {
+    defects: "不应该被改写",
+    defectTags: [{ name: "缩釉", severity: "mild" }]
+  }, db);
+  assertEq(defectTextReview.status, 400, "待复盘试片通过旧入口更新缺陷标签时不能顺带修改缺陷文本");
+  assertEq(coll.tiles.find(t => t.id === "AG-GUARD-PENDING-REVIEW").defects, "原始缺陷", "待复盘旧入口拒绝后缺陷文本未变化");
 
   const addDefectArchived = await handleAddDefectTag("AG-GUARD-ARCHIVED", { name: "开裂", severity: "mild" }, db);
   assertEq(addDefectArchived.status, 400, "已归档试片通过旧入口添加缺陷标签被拒绝");
