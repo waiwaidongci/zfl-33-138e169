@@ -1110,6 +1110,234 @@ async function test11_batch_usage_summary() {
   assert("consumptionByIngredient" in fullResult.data, "包含 consumptionByIngredient 字段");
 }
 
+async function test12_batch_summary_grouped() {
+  console.log("\nTest 12: 批次摘要扩展分组统计");
+
+  await setupMigratedDb();
+
+  const { loadDb, saveDb, getCollections } = await import("../lib/db.js");
+  const { insertBatch } = await import("../lib/batch-repository.js");
+  const { handleGetBatchSummary } = await import("../lib/batch-routes.js");
+  const { handleCreateBatch, handleAddBatchTiles } = await import("../lib/batch-routes.js");
+  const { insertRecipeVersion } = await import("../lib/recipe-repository.js");
+  const { TILE_STATUSES } = await import("../lib/tile-status-machine.js");
+  const { handleCreateTile } = await import("../lib/routes.js");
+
+  const db = await loadDb();
+  const coll = getCollections(db);
+
+  console.log("  12.1 准备配方版本和批次测试数据");
+
+  insertRecipeVersion(db, {
+    id: "RCV-TEST-01",
+    recipeId: "RC-TEST",
+    version: 1,
+    text: "松灰45 长石35 石英15 高岭5",
+    createdAt: "2026-06-20"
+  });
+  insertRecipeVersion(db, {
+    id: "RCV-TEST-02",
+    recipeId: "RC-TEST",
+    version: 2,
+    text: "松灰50 长石30 石英15 高岭5",
+    createdAt: "2026-06-20"
+  });
+
+  const createBatchResult = await handleCreateBatch({
+    kiln: "K-1",
+    name: "分组统计测试批次",
+    plannedDate: "2026-06-20",
+    targetAtmosphere: "氧化"
+  }, db);
+  assertEq(createBatchResult.status, 201, "测试批次创建成功");
+  const batchId = createBatchResult.data.id;
+
+  const createdTileIds = [
+    "AG-SUMMARY-G01",
+    "AG-SUMMARY-G02",
+    "AG-SUMMARY-G03",
+    "AG-SUMMARY-G04",
+    "AG-SUMMARY-G05",
+    "AG-SUMMARY-G06"
+  ];
+
+  const tileDataList = [
+    {
+      id: "AG-SUMMARY-G01",
+      body: "粗陶坯", recipe: "松灰45 长石35 石英15 高岭5", recipeVersionId: "RCV-TEST-01",
+      ashSource: "南山松灰", kiln: "K-1", peakTemp: 1240, color: "青灰",
+      score: 85, status: TILE_STATUSES.FIRED,
+      statusHistory: [], batchId: null, inventoryDeducted: false,
+      glazeThickness: "", firingCurve: [], observations: [],
+      defects: "",
+      defectTags: [{ name: "缩釉", severity: "medium" }, { name: "针孔", severity: "mild" }]
+    },
+    {
+      id: "AG-SUMMARY-G02",
+      body: "粗陶坯", recipe: "松灰45 长石35 石英15 高岭5", recipeVersionId: "RCV-TEST-01",
+      ashSource: "南山松灰", kiln: "K-1", peakTemp: 1245, color: "天青",
+      score: 92, status: TILE_STATUSES.FIRED,
+      statusHistory: [], batchId: null, inventoryDeducted: false,
+      glazeThickness: "", firingCurve: [], observations: [],
+      defects: "",
+      defectTags: []
+    },
+    {
+      id: "AG-SUMMARY-G03",
+      body: "粗陶坯", recipe: "松灰45 长石35 石英15 高岭5", recipeVersionId: "RCV-TEST-01",
+      ashSource: "莫干山竹灰", kiln: "K-1", peakTemp: 1240, color: "灰青",
+      score: 58, status: TILE_STATUSES.FIRED,
+      statusHistory: [], batchId: null, inventoryDeducted: false,
+      glazeThickness: "", firingCurve: [], observations: [],
+      defects: "",
+      defectTags: [{ name: "开裂", severity: "severe" }, { name: "起泡", severity: "severe" }]
+    },
+    {
+      id: "AG-SUMMARY-G04",
+      body: "细瓷坯", recipe: "松灰50 长石30 石英15 高岭5", recipeVersionId: "RCV-TEST-02",
+      ashSource: "莫干山竹灰", kiln: "K-1", peakTemp: 1260, color: "月白",
+      score: 76, status: TILE_STATUSES.FIRED,
+      statusHistory: [], batchId: null, inventoryDeducted: false,
+      glazeThickness: "", firingCurve: [], observations: [],
+      defects: "",
+      defectTags: [{ name: "流釉", severity: "mild" }]
+    },
+    {
+      id: "AG-SUMMARY-G05",
+      body: "细瓷坯", recipe: "松灰50 长石30 石英15 高岭5", recipeVersionId: "RCV-TEST-02",
+      ashSource: "东北稻灰", kiln: "K-1", peakTemp: 1255, color: "乳白",
+      score: 65, status: TILE_STATUSES.FIRED,
+      statusHistory: [], batchId: null, inventoryDeducted: false,
+      glazeThickness: "", firingCurve: [], observations: [],
+      defects: "",
+      defectTags: [{ name: "针孔", severity: "medium" }]
+    },
+    {
+      id: "AG-SUMMARY-G06",
+      body: "细瓷坯", recipe: "未绑定版本的配方", recipeVersionId: null,
+      ashSource: "东北稻灰", kiln: "K-1", peakTemp: 1250, color: "",
+      score: 0, status: TILE_STATUSES.FIRED,
+      statusHistory: [], batchId: null, inventoryDeducted: false,
+      glazeThickness: "", firingCurve: [], observations: [],
+      defects: "",
+      defectTags: []
+    }
+  ];
+
+  for (const td of tileDataList) {
+    coll.tiles.push(td);
+  }
+  assertEq(createdTileIds.length, 6, "6 个测试试片创建成功");
+
+  await saveDb(db);
+
+  const addTilesResult = await handleAddBatchTiles(batchId, { tileIds: createdTileIds }, db);
+  assertEq(addTilesResult.status, 200, `试片加入批次成功（status=${addTilesResult.status}, msg=${JSON.stringify(addTilesResult.data)}）`);
+  assertEq(addTilesResult.data.added.length, 6, "6 个试片全部加入批次");
+
+  await saveDb(db);
+
+  console.log("  12.2 不存在的批次返回 404");
+  const notFoundSummary = await handleGetBatchSummary("NON-EXISTENT", db);
+  assertEq(notFoundSummary.status, 404, "不存在的批次返回 404");
+  assertEq(notFoundSummary.data.error, "batch_not_found", "错误类型正确");
+
+  console.log("  12.3 向后兼容性：原有字段全部保留");
+  const summary = await handleGetBatchSummary(batchId, db);
+  assertEq(summary.status, 200, "批次摘要查询成功");
+  const d = summary.data;
+  assert("batchId" in d && d.batchId === batchId, "batchId 字段保留且正确");
+  assert("batchName" in d, "batchName 字段保留");
+  assert("kiln" in d && d.kiln === "K-1", "kiln 字段保留且正确");
+  assert("plannedDate" in d, "plannedDate 字段保留");
+  assert("targetAtmosphere" in d, "targetAtmosphere 字段保留");
+  assert("status" in d, "status 字段保留");
+  assert("totalTiles" in d && d.totalTiles === 6, "totalTiles 正确（6）");
+  assert("scoredTiles" in d && d.scoredTiles === 5, "scoredTiles 正确（5 个有评分）");
+  assert("avgScore" in d, "avgScore 字段保留");
+  assert("maxScore" in d && d.maxScore === 92, "maxScore 正确（92）");
+  assert("minScore" in d && d.minScore === 58, "minScore 正确（58）");
+  assert("defectSummary" in d, "defectSummary 旧字段保留（向后兼容）");
+  assert("colorSummary" in d, "colorSummary 字段保留");
+  assert("missingTileIds" in d, "missingTileIds 字段保留");
+  assert("observations" in d, "observations 字段保留");
+  assert(Array.isArray(d.tiles), "tiles 数组保留");
+  assertEq(d.tiles.length, 6, "tiles 数组有 6 条记录");
+  assert("recipeVersionId" in d.tiles[0], "tiles 子对象现在包含 recipeVersionId 字段");
+
+  console.log("  12.4 defectBySeverity：按缺陷严重度统计正确");
+  assert(Array.isArray(d.defectBySeverity), "defectBySeverity 是数组");
+  assertEq(d.defectBySeverity.length, 3, "严重度有 3 个等级");
+  const mildItem = d.defectBySeverity.find(x => x.key === "mild");
+  const mediumItem = d.defectBySeverity.find(x => x.key === "medium");
+  const severeItem = d.defectBySeverity.find(x => x.key === "severe");
+  assert(mildItem && mildItem.label === "轻微", "mild 标签正确");
+  assert(mediumItem && mediumItem.label === "中等", "medium 标签正确");
+  assert(severeItem && severeItem.label === "严重", "severe 标签正确");
+  assertEq(mildItem.count, 2, "轻度缺陷共 2 个（针孔+流釉）");
+  assertEq(mediumItem.count, 2, "中度缺陷共 2 个（缩釉+针孔）");
+  assertEq(severeItem.count, 2, "重度缺陷共 2 个（开裂+起泡）");
+
+  console.log("  12.5 groupByAshSource：按灰源分组统计正确");
+  assert(Array.isArray(d.groupByAshSource), "groupByAshSource 是数组");
+  const ashSources = d.groupByAshSource.map(g => g.ashSource).sort();
+  assert(ashSources.includes("南山松灰"), "南山松灰分组存在");
+  assert(ashSources.includes("莫干山竹灰"), "莫干山竹灰分组存在");
+  assert(ashSources.includes("东北稻灰"), "东北稻灰分组存在");
+  const nanshan = d.groupByAshSource.find(g => g.ashSource === "南山松灰");
+  assertEq(nanshan.tileCount, 2, "南山松灰有 2 个试片");
+  assertEq(nanshan.tilesWithDefects, 1, "南山松灰有 1 个有缺陷的试片");
+  assertEq(nanshan.defectRate, 50, "南山松灰缺陷率 50%");
+  const moganshan = d.groupByAshSource.find(g => g.ashSource === "莫干山竹灰");
+  assertEq(moganshan.tileCount, 2, "莫干山竹灰有 2 个试片");
+  assertEq(moganshan.tilesWithDefects, 2, "莫干山竹灰 2 个都有缺陷");
+  assertEq(moganshan.severityCounts.find(s => s.key === "severe").count, 2, "莫干山竹灰重度 2 个");
+  const dongbei = d.groupByAshSource.find(g => g.ashSource === "东北稻灰");
+  assertEq(dongbei.tileCount, 2, "东北稻灰有 2 个试片");
+
+  console.log("  12.6 groupByRecipeVersion：按配方版本分组统计正确");
+  assert(Array.isArray(d.groupByRecipeVersion), "groupByRecipeVersion 是数组");
+  const v1 = d.groupByRecipeVersion.find(g => g.recipeVersionId === "RCV-TEST-01");
+  const v2 = d.groupByRecipeVersion.find(g => g.recipeVersionId === "RCV-TEST-02");
+  const unassigned = d.groupByRecipeVersion.find(g => g.recipeVersionId === null);
+  assert(v1, "RCV-TEST-01 分组存在");
+  assert(v2, "RCV-TEST-02 分组存在");
+  assert(unassigned, "未绑定版本分组存在");
+  assertEq(v1.tileCount, 3, "RCV-TEST-01 有 3 个试片");
+  assertEq(v1.scoredTiles, 3, "RCV-TEST-01 有 3 个评分试片");
+  assertEq(v1.avgScore, 78.3, "RCV-TEST-01 平均分（85+92+58）/3=78.3");
+  assertEq(v1.maxScore, 92, "RCV-TEST-01 最高分 92");
+  assertEq(v1.minScore, 58, "RCV-TEST-01 最低分 58");
+  assertEq(v1.tilesWithDefects, 2, "RCV-TEST-01 有 2 个带缺陷的试片");
+  assert(v1.defectCounts.some(c => c.name === "开裂" && c.count === 1), "RCV-TEST-01 开裂缺陷统计正确");
+  assertEq(v2.tileCount, 2, "RCV-TEST-02 有 2 个试片");
+  assertEq(v2.scoredTiles, 2, "RCV-TEST-02 有 2 个评分试片");
+  assertEq(v2.avgScore, 70.5, "RCV-TEST-02 平均分（76+65）/2=70.5");
+  assertEq(unassigned.tileCount, 1, "未绑定版本有 1 个试片");
+  assertEq(unassigned.scoredTiles, 0, "未绑定版本试片未评分");
+  assertEq(unassigned.label, "未绑定配方版本", "未绑定版本标签正确");
+
+  console.log("  12.7 groupByScoreRange：按评分区间分组统计正确");
+  assert(Array.isArray(d.groupByScoreRange), "groupByScoreRange 是数组");
+  assertEq(d.groupByScoreRange.length, 6, "评分区间固定为 6 段（含未评分）");
+  const unscored = d.groupByScoreRange.find(r => r.key === "unscored");
+  const fail = d.groupByScoreRange.find(r => r.key === "fail");
+  const pass = d.groupByScoreRange.find(r => r.key === "pass");
+  const good = d.groupByScoreRange.find(r => r.key === "good");
+  const excellent = d.groupByScoreRange.find(r => r.key === "excellent");
+  const outstanding = d.groupByScoreRange.find(r => r.key === "outstanding");
+  assertEq(unscored.tileCount, 1, "未评分 1 个（待烧成试片）");
+  assertEq(unscored.label, "未评分", "未评分标签正确");
+  assertEq(fail.tileCount, 1, "不及格 1 个（58 分）");
+  assertEq(pass.tileCount, 1, "及格 1 个（65 分）");
+  assertEq(good.tileCount, 1, "良好 1 个（76 分）");
+  assertEq(excellent.tileCount, 1, "优秀 1 个（85 分）");
+  assertEq(outstanding.tileCount, 1, "卓越 1 个（92 分）");
+  const allTileIdsInRanges = d.groupByScoreRange.flatMap(r => r.tileIds);
+  assertEq(allTileIdsInRanges.length, 6, "所有区间的 tileIds 并集等于试片总数 6");
+  assertEq(allTileIdsInRanges.length, new Set(allTileIdsInRanges).size, "区间互斥：无重复试片");
+}
+
 async function run() {
   try {
     await setupTestEnv();
@@ -1125,6 +1353,7 @@ async function run() {
     await test9_legacy_entry_guards();
     await test10_tile_list_advanced_filters();
     await test11_batch_usage_summary();
+    await test12_batch_summary_grouped();
 
     console.log(`\n========== Results: ${passed} passed, ${failed} failed ==========`);
     if (failed > 0) {

@@ -796,7 +796,33 @@ curl -X POST http://localhost:3033/batches/BATCH-001/observations \
 
 `GET /batches/:id/summary`
 
-摘要会统计批次内已匹配试片的数量、评分、缺陷分布、釉色分布、缺失试片 id 和批次观察记录。
+摘要会统计批次内已匹配试片的数量、评分、缺陷分布、釉色分布、缺失试片 id、批次观察记录，以及按多维度的分组统计。
+
+**基础字段**（保持向后兼容）：
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `batchId` | string | 批次 id |
+| `batchName` | string | 批次名称 |
+| `kiln` | string | 窑号 |
+| `plannedDate` | string | 计划日期 |
+| `targetAtmosphere` | string | 目标气氛 |
+| `status` | string | 批次状态 |
+| `totalTiles` | number | 批次内试片总数 |
+| `scoredTiles` | number | 已评分数 |
+| `avgScore` / `maxScore` / `minScore` | number | 评分统计 |
+| `defectSummary` | object | 按缺陷名称的旧版文本统计（兼容旧入口） |
+| `colorSummary` | object | 按釉色分组计数 |
+| `missingTileIds` | array | 批次中引用但不存在的试片 id |
+| `observations` | array | 批次观察记录 |
+| `tiles` | array | 批次内所有试片的精简信息（含 `recipeVersionId`） |
+
+**新增分组统计字段**：
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `defectBySeverity` | array | 按缺陷严重度统计（轻度 `mild`、中度 `medium`、重度 `severe`），每项含 `key`、`label`（中文标签）、`count` |
+| `groupByAshSource` | array | 按灰源分组，每组含 `tileCount`、`tilesWithDefects`、`defectRate`（%）、`defectCounts`（缺陷明细）、`severityCounts`（严重度分布） |
+| `groupByRecipeVersion` | array | 按配方版本分组，每组含 `recipeVersionId`、`recipeVersion`（版本号）、`recipeText`、`label`、评分统计（`avgScore`/`maxScore`/`minScore`）、缺陷率、缺陷明细及严重度分布 |
+| `groupByScoreRange` | array | 按评分区间分组（未评分 / <60 / 60-69 / 70-79 / 80-89 / ≥90），每组含 `key`、`label`、`tileCount`、`tileIds`（区间内试片 id 列表） |
 
 ```bash
 curl http://localhost:3033/batches/BATCH-001/summary

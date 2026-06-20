@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 1,
   "migrations": [
     {
       "version": 1,
@@ -7,13 +7,6 @@
       "description": "将单一 JSON 数据文件迁移为带 schemaVersion 的多集合数据格式，引入 collections 和 migrations 元数据字段",
       "appliedAt": "2026-06-20T13:00:13.852Z",
       "backupPath": "/Users/ali/Desktop/zfl  new solo coder/zfl-33/data/backups/ash-glaze_pre-migrate-v0_20260620-210013.bak.json"
-    },
-    {
-      "version": 2,
-      "name": "add-tile-status-fields",
-      "description": "为试片数据添加状态字段、状态历史记录和批次关联，支持完整的实验审核流转",
-      "appliedAt": "2026-06-20T15:00:00.598Z",
-      "backupPath": "/Users/ali/Desktop/zfl  new solo coder/zfl-33/data/backups/ash-glaze_pre-migrate-v1_20260620-230000.bak.json"
     }
   ],
   "collections": {
@@ -64,30 +57,7 @@
             "severity": "mild",
             "note": ""
           }
-        ],
-        "status": "archived",
-        "statusHistory": [
-          {
-            "from": null,
-            "to": "draft",
-            "fromLabel": null,
-            "toLabel": "草稿",
-            "operator": "migration",
-            "note": "数据迁移初始化：默认起始状态为 '草稿'",
-            "at": "2026-06-20T15:00:00.598Z"
-          },
-          {
-            "from": "draft",
-            "to": "archived",
-            "fromLabel": "草稿",
-            "toLabel": "已归档",
-            "operator": "migration",
-            "note": "数据迁移自动推断状态：根据现有数据推断为 '已归档'",
-            "at": "2026-06-20T15:00:00.598Z"
-          }
-        ],
-        "batchId": null,
-        "inventoryDeducted": false
+        ]
       },
       {
         "id": "AG-002",
@@ -114,30 +84,7 @@
             "severity": "mild",
             "note": ""
           }
-        ],
-        "status": "archived",
-        "statusHistory": [
-          {
-            "from": null,
-            "to": "draft",
-            "fromLabel": null,
-            "toLabel": "草稿",
-            "operator": "migration",
-            "note": "数据迁移初始化：默认起始状态为 '草稿'",
-            "at": "2026-06-20T15:00:00.598Z"
-          },
-          {
-            "from": "draft",
-            "to": "archived",
-            "fromLabel": "草稿",
-            "toLabel": "已归档",
-            "operator": "migration",
-            "note": "数据迁移自动推断状态：根据现有数据推断为 '已归档'",
-            "at": "2026-06-20T15:00:00.598Z"
-          }
-        ],
-        "batchId": null,
-        "inventoryDeducted": false
+        ]
       },
       {
         "id": "AG-003",
@@ -158,30 +105,7 @@
           }
         ],
         "recipeVersionId": "RCV-0003",
-        "defectTags": [],
-        "status": "archived",
-        "statusHistory": [
-          {
-            "from": null,
-            "to": "draft",
-            "fromLabel": null,
-            "toLabel": "草稿",
-            "operator": "migration",
-            "note": "数据迁移初始化：默认起始状态为 '草稿'",
-            "at": "2026-06-20T15:00:00.598Z"
-          },
-          {
-            "from": "draft",
-            "to": "archived",
-            "fromLabel": "草稿",
-            "toLabel": "已归档",
-            "operator": "migration",
-            "note": "数据迁移自动推断状态：根据现有数据推断为 '已归档'",
-            "at": "2026-06-20T15:00:00.598Z"
-          }
-        ],
-        "batchId": null,
-        "inventoryDeducted": false
+        "defectTags": []
       },
       {
         "id": "AG-004",
@@ -197,30 +121,7 @@
         "score": 80,
         "observations": [],
         "recipeVersionId": "RCV-0004",
-        "defectTags": [],
-        "status": "pending_review",
-        "statusHistory": [
-          {
-            "from": null,
-            "to": "draft",
-            "fromLabel": null,
-            "toLabel": "草稿",
-            "operator": "migration",
-            "note": "数据迁移初始化：默认起始状态为 '草稿'",
-            "at": "2026-06-20T15:00:00.598Z"
-          },
-          {
-            "from": "draft",
-            "to": "pending_review",
-            "fromLabel": "草稿",
-            "toLabel": "待复盘",
-            "operator": "migration",
-            "note": "数据迁移自动推断状态：根据现有数据推断为 '待复盘'",
-            "at": "2026-06-20T15:00:00.598Z"
-          }
-        ],
-        "batchId": null,
-        "inventoryDeducted": false
+        "defectTags": []
       },
       {
         "id": "AG-005",
@@ -241,30 +142,7 @@
           }
         ],
         "recipeVersionId": "RCV-0005",
-        "defectTags": [],
-        "status": "archived",
-        "statusHistory": [
-          {
-            "from": null,
-            "to": "draft",
-            "fromLabel": null,
-            "toLabel": "草稿",
-            "operator": "migration",
-            "note": "数据迁移初始化：默认起始状态为 '草稿'",
-            "at": "2026-06-20T15:00:00.598Z"
-          },
-          {
-            "from": "draft",
-            "to": "archived",
-            "fromLabel": "草稿",
-            "toLabel": "已归档",
-            "operator": "migration",
-            "note": "数据迁移自动推断状态：根据现有数据推断为 '已归档'",
-            "at": "2026-06-20T15:00:00.598Z"
-          }
-        ],
-        "batchId": null,
-        "inventoryDeducted": false
+        "defectTags": []
       },
       {
         "id": "AG-006",
@@ -291,30 +169,7 @@
             "severity": "medium",
             "note": ""
           }
-        ],
-        "status": "archived",
-        "statusHistory": [
-          {
-            "from": null,
-            "to": "draft",
-            "fromLabel": null,
-            "toLabel": "草稿",
-            "operator": "migration",
-            "note": "数据迁移初始化：默认起始状态为 '草稿'",
-            "at": "2026-06-20T15:00:00.598Z"
-          },
-          {
-            "from": "draft",
-            "to": "archived",
-            "fromLabel": "草稿",
-            "toLabel": "已归档",
-            "operator": "migration",
-            "note": "数据迁移自动推断状态：根据现有数据推断为 '已归档'",
-            "at": "2026-06-20T15:00:00.598Z"
-          }
-        ],
-        "batchId": null,
-        "inventoryDeducted": false
+        ]
       },
       {
         "id": "AG-007",
@@ -336,30 +191,7 @@
             "severity": "mild",
             "note": ""
           }
-        ],
-        "status": "pending_review",
-        "statusHistory": [
-          {
-            "from": null,
-            "to": "draft",
-            "fromLabel": null,
-            "toLabel": "草稿",
-            "operator": "migration",
-            "note": "数据迁移初始化：默认起始状态为 '草稿'",
-            "at": "2026-06-20T15:00:00.598Z"
-          },
-          {
-            "from": "draft",
-            "to": "pending_review",
-            "fromLabel": "草稿",
-            "toLabel": "待复盘",
-            "operator": "migration",
-            "note": "数据迁移自动推断状态：根据现有数据推断为 '待复盘'",
-            "at": "2026-06-20T15:00:00.598Z"
-          }
-        ],
-        "batchId": null,
-        "inventoryDeducted": false
+        ]
       },
       {
         "id": "AG-008",
@@ -386,30 +218,7 @@
             "severity": "medium",
             "note": ""
           }
-        ],
-        "status": "archived",
-        "statusHistory": [
-          {
-            "from": null,
-            "to": "draft",
-            "fromLabel": null,
-            "toLabel": "草稿",
-            "operator": "migration",
-            "note": "数据迁移初始化：默认起始状态为 '草稿'",
-            "at": "2026-06-20T15:00:00.598Z"
-          },
-          {
-            "from": "draft",
-            "to": "archived",
-            "fromLabel": "草稿",
-            "toLabel": "已归档",
-            "operator": "migration",
-            "note": "数据迁移自动推断状态：根据现有数据推断为 '已归档'",
-            "at": "2026-06-20T15:00:00.598Z"
-          }
-        ],
-        "batchId": null,
-        "inventoryDeducted": false
+        ]
       },
       {
         "id": "AG-009",
@@ -425,30 +234,7 @@
         "score": 86,
         "observations": [],
         "recipeVersionId": "RCV-0001",
-        "defectTags": [],
-        "status": "pending_review",
-        "statusHistory": [
-          {
-            "from": null,
-            "to": "draft",
-            "fromLabel": null,
-            "toLabel": "草稿",
-            "operator": "migration",
-            "note": "数据迁移初始化：默认起始状态为 '草稿'",
-            "at": "2026-06-20T15:00:00.598Z"
-          },
-          {
-            "from": "draft",
-            "to": "pending_review",
-            "fromLabel": "草稿",
-            "toLabel": "待复盘",
-            "operator": "migration",
-            "note": "数据迁移自动推断状态：根据现有数据推断为 '待复盘'",
-            "at": "2026-06-20T15:00:00.598Z"
-          }
-        ],
-        "batchId": null,
-        "inventoryDeducted": false
+        "defectTags": []
       },
       {
         "id": "AG-010",
@@ -475,30 +261,7 @@
             "severity": "medium",
             "note": ""
           }
-        ],
-        "status": "archived",
-        "statusHistory": [
-          {
-            "from": null,
-            "to": "draft",
-            "fromLabel": null,
-            "toLabel": "草稿",
-            "operator": "migration",
-            "note": "数据迁移初始化：默认起始状态为 '草稿'",
-            "at": "2026-06-20T15:00:00.598Z"
-          },
-          {
-            "from": "draft",
-            "to": "archived",
-            "fromLabel": "草稿",
-            "toLabel": "已归档",
-            "operator": "migration",
-            "note": "数据迁移自动推断状态：根据现有数据推断为 '已归档'",
-            "at": "2026-06-20T15:00:00.598Z"
-          }
-        ],
-        "batchId": null,
-        "inventoryDeducted": false
+        ]
       },
       {
         "id": "AG-011",
@@ -525,30 +288,7 @@
             "severity": "medium",
             "note": ""
           }
-        ],
-        "status": "archived",
-        "statusHistory": [
-          {
-            "from": null,
-            "to": "draft",
-            "fromLabel": null,
-            "toLabel": "草稿",
-            "operator": "migration",
-            "note": "数据迁移初始化：默认起始状态为 '草稿'",
-            "at": "2026-06-20T15:00:00.598Z"
-          },
-          {
-            "from": "draft",
-            "to": "archived",
-            "fromLabel": "草稿",
-            "toLabel": "已归档",
-            "operator": "migration",
-            "note": "数据迁移自动推断状态：根据现有数据推断为 '已归档'",
-            "at": "2026-06-20T15:00:00.598Z"
-          }
-        ],
-        "batchId": null,
-        "inventoryDeducted": false
+        ]
       },
       {
         "id": "AG-012",
@@ -569,30 +309,7 @@
           }
         ],
         "recipeVersionId": "RCV-0010",
-        "defectTags": [],
-        "status": "archived",
-        "statusHistory": [
-          {
-            "from": null,
-            "to": "draft",
-            "fromLabel": null,
-            "toLabel": "草稿",
-            "operator": "migration",
-            "note": "数据迁移初始化：默认起始状态为 '草稿'",
-            "at": "2026-06-20T15:00:00.598Z"
-          },
-          {
-            "from": "draft",
-            "to": "archived",
-            "fromLabel": "草稿",
-            "toLabel": "已归档",
-            "operator": "migration",
-            "note": "数据迁移自动推断状态：根据现有数据推断为 '已归档'",
-            "at": "2026-06-20T15:00:00.598Z"
-          }
-        ],
-        "batchId": null,
-        "inventoryDeducted": false
+        "defectTags": []
       }
     ],
     "firingPlans": [],
