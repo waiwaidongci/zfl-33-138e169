@@ -1,0 +1,32 @@
+{
+  "tiles": [
+    {
+      "id": "AG-001",
+      "body": "粗陶坯",
+      "recipe": "松灰42 长石35 石英18 红土5",
+      "ashSource": "南山松灰",
+      "glazeThickness": "0.8mm",
+      "kiln": "K-2",
+      "firingCurve": [
+        {
+          "temp": 900,
+          "minutes": 60
+        },
+        {
+          "temp": 1240,
+          "minutes": 35
+        }
+      ],
+      "peakTemp": 1240,
+      "color": "青灰带油滴",
+      "defects": "边缘流釉",
+      "score": 82,
+      "observations": [
+        {
+          "at": "2026-06-10",
+          "note": "还原气氛后半段偏强"
+        }
+      ]
+    }
+  ]
+}
