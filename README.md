@@ -13,10 +13,11 @@ npm start
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | `/` | 服务信息与端点列表 |
-| GET | `/tiles?ashSource=&minTemp=` | 查询试片列表 |
+| GET | `/tiles?ashSource=&minTemp=&recipeVersionId=` | 查询试片列表 |
 | POST | `/tiles` | 新增单个试片 |
 | GET | `/tiles/:id` | 查询单个试片 |
 | POST | `/tiles/:id/observations` | 添加观察记录 |
+| POST | `/tiles/similar` | 试片相似度检索 |
 | GET | `/reports/recipes` | 配方汇总报告 |
 | POST | `/import/preview` | 批量导入预览 |
 | POST | `/import/commit` | 确认批量导入写入 |
@@ -630,3 +631,240 @@ curl -X POST http://localhost:3033/batches/BATCH-001/observations \
 ```bash
 curl http://localhost:3033/batches/BATCH-001/summary
 ```
+
+---
+
+## 试片相似度检索模块
+
+### 模块概述
+
+试片相似度检索模块根据用户输入的查询条件（坯体、香灰来源、峰值温度、配方、颜色关键词、缺陷关键词、评分），在历史试片库中进行多维度加权匹配，返回最相似的试片列表，并提供每条匹配结果的可解释原因。相似度计算完全在本地完成，**不依赖任何外部 AI 服务**。
+
+### 计算公式
+
+综合相似度采用**加权平均**，公式如下：
+
+```
+similarityScore = Σ(维度得分 × 维度权重) / Σ(维度权重)
+```
+
+仅用户实际提供的查询条件参与计算，未提供的条件不纳入分子和分母。峰值温度维度额外引入温差衰减权重，温差越大，该维度在总分中的实际占比越低。
+
+### 相似度评分规则
+
+| 维度 | 权重 | 评分规则 |
+|------|------|----------|
+| 坯体 (body) | 20 | 完全匹配 100 分；字符串互相包含 70 分；否则 0 分 |
+| 香灰来源 (ashSource) | 20 | 完全匹配 100 分；分词后计算 Dice 系数 × 80 分；否则 0 分 |
+| 峰值温度 (peakTemp) | 25 | 温差 0℃ = 100 分；≤20℃ 线性递减至 70 分；20~50℃ 递减至 30 分；>50℃ 继续递减 |
+| 配方 (recipe) | 20 | 分词提取原料名称后计算重合比例，重合度 × 100 分 |
+| 颜色关键词 (colorKeywords) | 7 | 命中关键词数 / 关键词总数 × 100 分 |
+| 缺陷关键词 (defectKeywords) | 5 | 命中关键词数 / 关键词总数 × 100 分 |
+| 评分 (score) | 3 | max(0, 100 - 评分差 × 2) |
+
+#### 峰值温度权重衰减
+
+峰值温度维度在加权平均中引入温差衰减系数，温差越大该维度实际权重越低：
+
+| 温差范围 | 衰减系数 | 实际权重 |
+|----------|----------|----------|
+| 0 ~ 20℃ | 1.0 | 25 |
+| 21 ~ 50℃ | 0.5 | 12.5 |
+| > 50℃ | 0.1 | 2.5 |
+
+#### 配方原料提取规则
+
+配方文本按空格和标点分词后，取每段前缀中非数字部分作为原料名称。例如 `"松灰42 长石35 石英18 红土5"` 提取为 `["松灰", "长石", "石英", "红土"]`。匹配时支持子串包含（如 `"松灰"` 可匹配 `"南山松灰"`）。
+
+#### 香灰来源分词匹配
+
+香灰来源字段先分词（空格和标点分隔），再计算 Dice 系数：`Dice = 2 × 共有词数 / (查询词数 + 历史词数)`，得分 = `Dice × 80`。例如查询 `"南山松灰"` 与历史 `"北山松灰"` 共有词 `["松灰"]`，Dice = 2×1/(2+2) = 0.5，得分 = 40。
+
+### 1. 相似度检索接口
+
+`POST /tiles/similar`
+
+#### 请求参数
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `body` | string | - | 坯体类型 |
+| `ashSource` | string | - | 香灰来源 |
+| `peakTemp` | number | - | 目标峰值温度（℃），必须 > 0 |
+| `recipe` | string | - | 釉方配方文本，用于原料重合度计算 |
+| `colorKeywords` | string / string[] | - | 颜色关键词，支持空格分隔字符串或字符串数组 |
+| `color` | string | - | 颜色关键词（与 `colorKeywords` 效果相同，同时传入时 `colorKeywords` 优先） |
+| `defectKeywords` | string / string[] | - | 缺陷关键词，支持空格分隔字符串或字符串数组 |
+| `defects` | string | - | 缺陷关键词（与 `defectKeywords` 效果相同，同时传入时 `defectKeywords` 优先） |
+| `score` | number | - | 目标评分 0-100，必须 > 0 |
+| `topN` | number | - | 返回条数，默认 5，范围 1-50 |
+| `minScore` | number | - | 最低相似度阈值 0-100，低于此值的结果不返回，默认 0 |
+
+> 至少需要提供一个查询条件，否则返回 400 错误。
+
+#### 错误响应
+
+| HTTP 状态码 | error 字段 | 触发条件 |
+|-------------|------------|----------|
+| 400 | `empty_query` | 未提供任何查询条件 |
+
+```json
+{
+  "error": "empty_query",
+  "message": "至少提供一个查询条件：body, ashSource, peakTemp, recipe, colorKeywords/color, defectKeywords/defects, score"
+}
+```
+
+#### 示例：按坯体 + 温度 + 配方检索
+
+```bash
+curl -X POST http://localhost:3033/tiles/similar \
+  -H "Content-Type: application/json" \
+  -d '{
+    "body": "粗陶坯",
+    "peakTemp": 1240,
+    "recipe": "松灰42 长石35 石英18 红土5",
+    "topN": 3
+  }'
+```
+
+#### 示例：按颜色和缺陷关键词检索
+
+```bash
+curl -X POST http://localhost:3033/tiles/similar \
+  -H "Content-Type: application/json" \
+  -d '{
+    "colorKeywords": ["青灰", "油滴"],
+    "defectKeywords": "流釉 针孔",
+    "ashSource": "南山松灰",
+    "topN": 5
+  }'
+```
+
+#### 示例：多条件综合检索（带最低阈值过滤）
+
+```bash
+curl -X POST http://localhost:3033/tiles/similar \
+  -H "Content-Type: application/json" \
+  -d '{
+    "body": "细瓷坯",
+    "ashSource": "东北稻灰",
+    "peakTemp": 1260,
+    "recipe": "稻灰40 长石40 石英18",
+    "colorKeywords": "月白",
+    "score": 85,
+    "minScore": 40
+  }'
+```
+
+#### 示例：只按坯体检索最接近的试片
+
+```bash
+curl -X POST http://localhost:3033/tiles/similar \
+  -H "Content-Type: application/json" \
+  -d '{
+    "body": "粗陶坯",
+    "topN": 10
+  }'
+```
+
+### 返回字段说明
+
+```jsonc
+{
+  "query": {                          // 实际参与计算的查询条件
+    "body": "粗陶坯",
+    "peakTemp": 1240,
+    "recipe": "松灰42 长石35 石英18 红土5"
+  },
+  "totalCandidates": 13,              // 数据库中候选试片总数
+  "resultCount": 3,                   // 本次返回的结果数
+  "weights": {                        // 当前使用的权重配置
+    "body": 20,
+    "ashSource": 20,
+    "peakTemp": 25,
+    "recipe": 20,
+    "colorKeywords": 7,
+    "defectKeywords": 5,
+    "score": 3
+  },
+  "results": [
+    {
+      "tile": { /* 完整试片数据，同 GET /tiles/:id */ },
+      "similarityScore": 100,         // 综合相似度 0-100
+      "reasons": [                    // 人类可读的匹配原因列表
+        "坯体完全匹配: \"粗陶坯\"",
+        "峰值温度完全一致: 查询1240℃ vs 历史1240℃，温差0℃",
+        "配方原料重合: 共有[松灰、长石、石英、红土]，重合度100% (查询4种 vs 历史4种)"
+      ],
+      "fieldMatches": {               // 各字段命中详情（便于程序化判断）
+        "body": true,                 // boolean，坯体是否匹配
+        "ashSource": false,           // boolean，香灰来源是否匹配
+        "peakTemp": 0,                // number | null，温差（℃），null 表示未查询
+        "recipe": ["松灰","长石","石英","红土"],  // string[]，重合的原料名称
+        "colorKeywords": [],          // string[]，命中的颜色关键词
+        "defectKeywords": [],         // string[]，命中的缺陷关键词
+        "score": null                 // number | null，评分差，null 表示未查询
+      },
+      "details": {                    // 各维度细项得分（便于前端绘制雷达图等可视化）
+        "bodyScore": 100,             // 坯体匹配得分 0-100
+        "ashSourceScore": 0,          // 香灰来源匹配得分 0-100
+        "peakTempScore": 100,         // 峰值温度得分 0-100
+        "peakTempDiff": 0,            // 峰值温差（℃），null 表示未查询
+        "recipeScore": 100,           // 配方重合度得分 0-100
+        "recipeOverlapRatio": 1.0,    // 配方原料重合比例 0-1
+        "colorKeywordsScore": 0,      // 颜色关键词匹配得分 0-100
+        "defectKeywordsScore": 0,     // 缺陷关键词匹配得分 0-100
+        "scoreDiff": null,            // 评分差，null 表示未查询
+        "scoreDiffScore": 0           // 评分差维度得分 0-100
+      }
+    }
+  ]
+}
+```
+
+### `fieldMatches` 字段类型说明
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `body` | boolean | 坯体是否匹配（完全匹配或互相包含） |
+| `ashSource` | boolean | 香灰来源是否匹配（完全匹配或词有交集） |
+| `peakTemp` | number / null | 温差绝对值（℃），仅查询了 peakTemp 时有值，否则 null |
+| `recipe` | string[] | 命中的共同原料名称列表 |
+| `colorKeywords` | string[] | 在试片颜色中命中的关键词列表 |
+| `defectKeywords` | string[] | 在试片缺陷中命中的关键词列表 |
+| `score` | number / null | 评分差的绝对值，仅查询了 score 时有值，否则 null |
+
+### `details` 字段类型说明
+
+| 字段 | 类型 | 范围 | 说明 |
+|------|------|------|------|
+| `bodyScore` | number | 0-100 | 坯体维度得分 |
+| `ashSourceScore` | number | 0-100 | 香灰来源维度得分 |
+| `peakTempScore` | number | 0-100 | 峰值温度维度得分 |
+| `peakTempDiff` | number / null | - | 峰值温差（℃），未查询时为 null |
+| `recipeScore` | number | 0-100 | 配方重合度得分 |
+| `recipeOverlapRatio` | number | 0-1 | 配方原料重合比例 |
+| `colorKeywordsScore` | number | 0-100 | 颜色关键词维度得分 |
+| `defectKeywordsScore` | number | 0-100 | 缺陷关键词维度得分 |
+| `scoreDiff` | number / null | - | 评分差绝对值，未查询时为 null |
+| `scoreDiffScore` | number | 0-100 | 评分差维度得分 |
+
+### 结果解释示例
+
+假设查询条件为 `{ body: "粗陶坯", peakTemp: 1240, colorKeywords: "青灰 油滴" }`：
+
+| reasons 文本 | 解释 |
+|-------------|------|
+| `坯体完全匹配: "粗陶坯"` | 坯体字段完全一致 |
+| `峰值温度非常接近: 查询1240℃ vs 历史1245℃，温差5℃` | 温差在 20℃ 以内，属于"非常接近"区间 |
+| `颜色关键词命中[青灰]，覆盖率50%` | 提供了 2 个关键词，命中 1 个 |
+
+峰值温度的描述级别对应关系：
+
+| 温差 | 描述级别 |
+|------|----------|
+| 0℃ | 完全一致 |
+| 1 ~ 20℃ | 非常接近 |
+| 21 ~ 50℃ | 接近 |
+| > 50℃ | 差异较大 |
