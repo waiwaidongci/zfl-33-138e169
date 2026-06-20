@@ -256,24 +256,34 @@ curl -X POST http://localhost:3033/firing-plans/calculate \
   "holdMinutes": 35,
   "heatingStages": [],
   "firingCurve": [                    // 规范化后的烧成曲线
-    { "temp": 600, "minutes": 180 },
-    { "temp": 900, "minutes": 120 },
-    { "temp": 1100, "minutes": 90 },
-    { "temp": 1240, "minutes": 140 }
+    { "temp": 25, "minutes": 0 },
+    { "temp": 600, "minutes": 192 },
+    { "temp": 900, "minutes": 312 },
+    { "temp": 1100, "minutes": 412 },
+    { "temp": 1240, "minutes": 496 },
+    { "temp": 1240, "minutes": 531 }
   ],
-  "totalDurationMinutes": 530,          // 总烧成时间（分钟）
-  "totalDurationHours": 8.83,           // 总烧成时间（小时）
+  "totalDurationMinutes": 531,          // 总烧成时间（分钟）
+  "totalDurationHours": 8.85,           // 总烧成时间（小时）
   "heatingRates": [                          // 各阶段实际升温速率
-    { "from": 25, "to": 600, "rateCelsiusPerHour": 192 }
+    { "from": 25, "to": 600, "rateCelsiusPerHour": 180 },
+    { "from": 600, "to": 900, "rateCelsiusPerHour": 150 },
+    { "from": 900, "to": 1100, "rateCelsiusPerHour": 120 },
+    { "from": 1100, "to": 1240, "rateCelsiusPerHour": 100 }
   ],
   "risks": [                               // 风险提示列表
+    {
+      "level": "warning",
+      "code": "INITIAL_HEATING_FAST",
+      "message": "低温阶段升温速率 180℃/h 偏快，坯体残余水分可能导致开裂"
+    },
     {
       "level": "info",                     // danger / warning / info
       "code": "USING_DEFAULT_STAGES",
       "message": "未提供升温阶段，使用默认三段升温曲线"
     }
   ],
-  "riskCount": { "danger": 0, "warning": 0, "info": 1 },
+  "riskCount": { "danger": 0, "warning": 1, "info": 1 },
   "similarCurves": [                        // 历史相似曲线 Top3
     {
       "tileId": "AG-001",
@@ -283,8 +293,14 @@ curl -X POST http://localhost:3033/firing-plans/calculate \
       "tileScore": 82,
       "tileColor": "青灰带油滴",
       "tileDefects": "边缘流釉",
-      "tileFiringCurve": [{ "temp": 900, "minutes": 60 }, { "temp": 1240, "minutes": 35 }],
-      "similarity": 88.3,                    // 相似度 0-100
+      "tileFiringCurve": [
+        { "temp": 25, "minutes": 0 },
+        { "temp": 600, "minutes": 180 },
+        { "temp": 900, "minutes": 300 },
+        { "temp": 1240, "minutes": 510 },
+        { "temp": 1240, "minutes": 545 }
+      ],
+      "similarity": 95.7,                    // 相似度 0-100
       "peakTempDiff": 0                      // 峰值温差
     }
   ]
@@ -415,7 +431,14 @@ curl -X POST http://localhost:3033/firing-plans/FP-TEST-001/apply \
     "ashSource": "南山松灰",
     "glazeThickness": "0.8mm",
     "kiln": "K-2",
-    "firingCurve": [ ... ],
+    "firingCurve": [
+      { "temp": 25, "minutes": 0 },
+      { "temp": 600, "minutes": 192 },
+      { "temp": 900, "minutes": 312 },
+      { "temp": 1100, "minutes": 412 },
+      { "temp": 1240, "minutes": 496 },
+      { "temp": 1240, "minutes": 531 }
+    ],
     "peakTemp": 1240,
     "color": "",
     "defects": "",
