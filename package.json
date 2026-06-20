@@ -10,6 +10,8 @@
     "migrate:rollback": "node scripts/migrate-cli.js rollback",
     "migrate:backups": "node scripts/migrate-cli.js list-backups",
     "migrate:restore": "node scripts/migrate-cli.js restore",
-    "test:migrate": "node tests/migration.test.js"
+    "test:migrate": "node tests/migration.test.js",
+    "test:status": "node tests/tile-status-workflow.test.js",
+    "test:all": "node tests/migration.test.js && node tests/tile-status-workflow.test.js"
   }
 }

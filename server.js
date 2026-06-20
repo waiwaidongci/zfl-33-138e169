@@ -7,6 +7,7 @@ import {
   handleListTiles,
   handleCreateTile,
   handleGetTile,
+  handleUpdateTile,
   handleAddObservation,
   handleSimilarTiles,
   handleRecipesReport,
@@ -73,6 +74,14 @@ import {
   handleGetDefectsByPeakTemp,
   handleGetLowScoreTiles
 } from "./lib/dashboard-routes.js";
+import {
+  getStatusInfo,
+  handleGetTileStatus,
+  handleTransitionStatus,
+  handleUpdateTileWithStatus,
+  handleGetStatusHistory,
+  handleBatchStatusTransition
+} from "./lib/tile-status-routes.js";
 
 const port = Number(process.env.PORT || 3033);
 
@@ -90,6 +99,10 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, routesInfo());
     }
 
+    if (req.method === "GET" && url.pathname === "/tile-status/info") {
+      return send(res, 200, getStatusInfo());
+    }
+
     if (req.method === "GET" && url.pathname === "/tiles") {
       const r = await handleListTiles(url, db);
       return send(res, r.status, r.data);
@@ -104,6 +117,12 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "POST" && url.pathname === "/tiles/similar") {
       const input = await readJsonBody(req);
       const r = await handleSimilarTiles(input, db);
+      return send(res, r.status, r.data);
+    }
+
+    if (req.method === "POST" && url.pathname === "/tiles/batch-status") {
+      const input = await readJsonBody(req);
+      const r = await handleBatchStatusTransition(input, db);
       return send(res, r.status, r.data);
     }
 
@@ -125,9 +144,31 @@ const server = http.createServer(async (req, res) => {
       return send(res, r.status, r.data);
     }
 
+    const tileStatusHistoryMatch = url.pathname.match(/^\/tiles\/([^/]+)\/status-history$/);
+    if (tileStatusHistoryMatch && req.method === "GET") {
+      const r = await handleGetStatusHistory(tileStatusHistoryMatch[1], db);
+      return send(res, r.status, r.data);
+    }
+
+    const tileStatusMatch = url.pathname.match(/^\/tiles\/([^/]+)\/status$/);
+    if (tileStatusMatch && req.method === "GET") {
+      const r = await handleGetTileStatus(tileStatusMatch[1], db);
+      return send(res, r.status, r.data);
+    }
+    if (tileStatusMatch && req.method === "PATCH") {
+      const input = await readJsonBody(req);
+      const r = await handleTransitionStatus(tileStatusMatch[1], input, db);
+      return send(res, r.status, r.data);
+    }
+
     const tileMatch = url.pathname.match(/^\/tiles\/([^/]+)$/);
     if (tileMatch && req.method === "GET") {
       const r = await handleGetTile(tileMatch[1], db);
+      return send(res, r.status, r.data);
+    }
+    if (tileMatch && req.method === "PATCH") {
+      const input = await readJsonBody(req);
+      const r = await handleUpdateTile(tileMatch[1], input, db);
       return send(res, r.status, r.data);
     }
 

@@ -83,7 +83,7 @@ async function test1_formatDetection() {
 
   const converted = toNewFormat(rawLegacy);
   assert(typeof converted.schemaVersion === "number", "转换后有 schemaVersion 字段");
-  assertEq(converted.schemaVersion, 1, "转换后 schemaVersion 为 1");
+  assertEq(converted.schemaVersion, 2, "转换后 schemaVersion 为 2");
   assert(Array.isArray(converted.migrations), "有 migrations 数组");
   assert(typeof converted.collections === "object", "有 collections 对象");
 
@@ -154,14 +154,15 @@ async function test3_migrationUp() {
   const upResult = await migrateToLatest({ autoBackup: true });
   assert(upResult.success, "migrateToLatest 执行成功");
   assertEq(upResult.fromVersion, 0, "迁移起始版本为 0");
-  assertEq(upResult.toVersion, 1, "迁移目标版本为 1");
+  assertEq(upResult.toVersion, 2, "迁移目标版本为 2");
   assert(upResult.backupPath !== null, "迁移前创建了备份");
   assert(existsSync(upResult.backupPath), "备份文件存在");
 
   const dbAfter = await loadDb();
-  assertEq(getSchemaVersion(dbAfter), 1, "迁移后 schemaVersion=1");
-  assertEq(getMigrations(dbAfter).length, 1, "迁移记录有 1 条");
-  assertEq(getMigrations(dbAfter)[0].version, 1, "迁移记录版本正确");
+  assertEq(getSchemaVersion(dbAfter), 2, "迁移后 schemaVersion=2");
+  assertEq(getMigrations(dbAfter).length, 2, "迁移记录有 2 条");
+  assertEq(getMigrations(dbAfter)[0].version, 1, "第一条迁移记录版本正确");
+  assertEq(getMigrations(dbAfter)[1].version, 2, "第二条迁移记录版本正确");
 
   const coll = getCollections(dbAfter);
   assertEq(coll.tiles.length, 2, "迁移后 tiles 数据完整");
@@ -178,12 +179,23 @@ async function test4_migrationRollback() {
 
   const rbResult = await rollbackLastMigration({ autoBackup: true });
   assert(rbResult.success, "rollbackLastMigration 执行成功");
-  assertEq(rbResult.rolledBack.version, 1, "回滚的版本为 1");
-  assertEq(rbResult.previousVersion, 0, "回滚后版本为 0");
+  assertEq(rbResult.rolledBack.version, 2, "回滚的版本为 2");
+  assertEq(rbResult.previousVersion, 1, "回滚后版本为 1");
 
   const dbRolled = JSON.parse(await readFile(testDbPath, "utf8"));
-  assert(!("schemaVersion" in dbRolled), "回滚后恢复旧格式（无 schemaVersion）");
-  assertEq(dbRolled.tiles.length, 2, "回滚后 tiles 数据完整");
+  assert("schemaVersion" in dbRolled, "回滚后仍有 schemaVersion 字段（从 v2 回滚到 v1）");
+  assertEq(dbRolled.schemaVersion, 1, "回滚后 schemaVersion 为 1");
+  assertEq(dbRolled.migrations.length, 1, "回滚后迁移记录有 1 条");
+  assertEq(dbRolled.collections.tiles.length, 2, "回滚后 tiles 数据完整");
+
+  const rbResult2 = await rollbackLastMigration({ autoBackup: true });
+  assert(rbResult2.success, "第二次回滚执行成功");
+  assertEq(rbResult2.rolledBack.version, 1, "回滚的版本为 1");
+  assertEq(rbResult2.previousVersion, 0, "回滚后版本为 0");
+
+  const dbRolled2 = JSON.parse(await readFile(testDbPath, "utf8"));
+  assert(!("schemaVersion" in dbRolled2), "回滚后恢复旧格式（无 schemaVersion）");
+  assertEq(dbRolled2.tiles.length, 2, "回滚后 tiles 数据完整");
 }
 
 async function test5_migrationFailurePreservesOriginal() {
@@ -241,7 +253,7 @@ export function validate() {
   const realUpResult = await migrateToLatest({ autoBackup: true });
   assert(realUpResult.success === true, "正常迁移可以成功执行");
   assert(realUpResult.fromVersion === 0, "正常迁移起始版本正确");
-  assert(realUpResult.toVersion === 1, "正常迁移目标版本正确");
+  assert(realUpResult.toVersion === 2, "正常迁移目标版本正确");
 
   const allBackups = await listBackups();
   assert(allBackups.length >= 2, "至少有 2 个备份（失败场景+正常迁移）");
@@ -277,7 +289,7 @@ async function test7_startupAutoMigration() {
   assert(result.result.success === true, "自动迁移成功");
 
   const db = await loadDb();
-  assertEq(getSchemaVersion(db), 1, "自动迁移后版本为 1");
+  assertEq(getSchemaVersion(db), 2, "自动迁移后版本为 2");
 
   const result2 = await autoMigrateOnStartup();
   assert(result2.needed === false, "第二次启动无需迁移");
