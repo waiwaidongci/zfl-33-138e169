@@ -134,7 +134,7 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === "POST" && url.pathname === "/import/commit") {
       const input = await readJsonBody(req);
-      const r = await handleImportCommit(input);
+      const r = await handleImportCommit(input, db);
       return send(res, r.status, r.data);
     }
 

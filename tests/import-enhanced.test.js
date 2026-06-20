@@ -2,6 +2,7 @@ import { mkdir, writeFile, rm } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { spawn } from "node:child_process";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = dirname(__dirname);
@@ -93,6 +94,48 @@ async function cleanup() {
   if (existsSync(testDir)) {
     await rm(testDir, { recursive: true });
   }
+}
+
+function waitForServer(child, port) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`server did not start on port ${port}`));
+    }, 5000);
+    const onData = data => {
+      const text = data.toString();
+      if (text.includes(`http://localhost:${port}`)) {
+        clearTimeout(timer);
+        child.stdout.off("data", onData);
+        resolve();
+      }
+    };
+    child.stdout.on("data", onData);
+    child.stderr.on("data", data => {
+      const text = data.toString();
+      if (text.includes("EADDRINUSE")) {
+        clearTimeout(timer);
+        reject(new Error(`port ${port} already in use`));
+      }
+    });
+    child.once("exit", code => {
+      clearTimeout(timer);
+      reject(new Error(`server exited before ready with code ${code}`));
+    });
+  });
+}
+
+function stopServer(child) {
+  return new Promise(resolve => {
+    if (child.exitCode !== null || child.signalCode) {
+      resolve();
+      return;
+    }
+    child.once("exit", resolve);
+    child.kill("SIGTERM");
+    setTimeout(() => {
+      if (child.exitCode === null && !child.signalCode) child.kill("SIGKILL");
+    }, 1000);
+  });
 }
 
 console.log("\n=== 增强批量导入流程测试 ===\n");
@@ -485,6 +528,74 @@ try {
   console.log(e.stack);
   failed++;
   failures.push(`handleImportCommit库存不足测试: ${e.message}`);
+}
+
+console.log("\n11. HTTP /import/preview -> /import/commit 路由集成测试");
+try {
+  await setupTestDb();
+  const port = 43217;
+  const child = spawn("node", ["server.js"], {
+    cwd: projectRoot,
+    env: {
+      ...process.env,
+      PORT: String(port),
+      ASH_GLAZE_DATA_DIR: testDataDir,
+      ASH_GLAZE_DB_PATH: testDbPath,
+      ASH_GLAZE_BACKUP_DIR: testBackupDir
+    },
+    stdio: ["ignore", "pipe", "pipe"]
+  });
+
+  try {
+    await waitForServer(child, port);
+    const importRows = [
+      {
+        id: "AG-HTTP-001",
+        body: "粗陶坯",
+        recipe: "松灰42 长石35 石英18 红土5",
+        recipeVersionId: "RCV-0001",
+        defectTags: [{ name: "流釉", severity: "mild" }],
+        materialBatchRefs: [
+          { ingredientName: "松灰", batchNo: "SG-2026-001" },
+          { ingredientName: "长石", batchNo: "CS-2026-001" },
+          { ingredientName: "石英", batchNo: "SY-2026-001" },
+          { ingredientName: "红土", batchNo: "HT-2026-001" }
+        ],
+        batchWeight: 10
+      }
+    ];
+
+    const previewRes = await fetch(`http://localhost:${port}/import/preview`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(importRows)
+    });
+    const preview = await previewRes.json();
+    assertEq(previewRes.status, 200, "HTTP预览应返回200");
+    assert(preview.previewToken, "HTTP预览应返回previewToken");
+    assertEq(preview.businessValidation.summary.canCommit, true, "HTTP预览应允许提交");
+
+    const commitRes = await fetch(`http://localhost:${port}/import/commit`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ previewToken: preview.previewToken, confirm: true })
+    });
+    const commit = await commitRes.json();
+    assertEq(commitRes.status, 200, "HTTP提交应返回200");
+    assertEq(commit.insertedCount, 1, "HTTP提交应插入1条记录");
+    assertEq(commit.businessErrorCount, 0, "HTTP提交不应有业务错误");
+
+    const db = await loadDb();
+    const insertedTile = db.collections.tiles.find(t => t.id === "AG-HTTP-001");
+    assert(insertedTile !== undefined, "HTTP提交后应写入试片");
+    assertEq(insertedTile.inventoryDeducted, true, "HTTP提交后应扣减库存");
+  } finally {
+    await stopServer(child);
+  }
+} catch (e) {
+  console.log(`  ✗ HTTP路由集成测试失败: ${e.message}`);
+  failed++;
+  failures.push(`HTTP路由集成测试: ${e.message}`);
 }
 
 await cleanup();
