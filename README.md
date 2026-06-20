@@ -20,6 +20,13 @@ npm start
 | GET | `/reports/recipes` | 配方汇总报告 |
 | POST | `/import/preview` | 批量导入预览 |
 | POST | `/import/commit` | 确认批量导入写入 |
+| POST | `/firing-plans/calculate` | 计算烧成曲线（仅预览，不保存） |
+| GET | `/firing-plans?kiln=&status=` | 查询规划草稿列表 |
+| POST | `/firing-plans` | 保存烧成规划草稿 |
+| GET | `/firing-plans/:id` | 查询单个规划草稿 |
+| PATCH | `/firing-plans/:id` | 更新规划草稿 |
+| DELETE | `/firing-plans/:id` | 删除规划草稿 |
+| POST | `/firing-plans/:id/apply` | 将规划应用为新试片记录 |
 
 ---
 
