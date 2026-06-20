@@ -7,6 +7,7 @@ import {
   handleCreateTile,
   handleGetTile,
   handleAddObservation,
+  handleSimilarTiles,
   handleRecipesReport,
   handleImportPreview,
   handleImportCommit,
@@ -75,6 +76,12 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "POST" && url.pathname === "/tiles") {
       const input = await readJsonBody(req);
       const r = await handleCreateTile(input, db);
+      return send(res, r.status, r.data);
+    }
+
+    if (req.method === "POST" && url.pathname === "/tiles/similar") {
+      const input = await readJsonBody(req);
+      const r = await handleSimilarTiles(input, db);
       return send(res, r.status, r.data);
     }
 

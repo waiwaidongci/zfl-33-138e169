@@ -80,6 +80,211 @@
         }
       ],
       "batchWeight": 10
+    },
+    {
+      "id": "AG-002",
+      "body": "粗陶坯",
+      "recipe": "松灰45 长石30 石英20 高岭5",
+      "ashSource": "南山松灰",
+      "glazeThickness": "1.0mm",
+      "kiln": "K-2",
+      "firingCurve": [],
+      "peakTemp": 1240,
+      "color": "青灰",
+      "defects": "轻微针孔",
+      "score": 78,
+      "observations": [
+        {
+          "at": "2026-05-20",
+          "note": "氧化气氛烧成"
+        }
+      ],
+      "recipeVersionId": "RCV-0002"
+    },
+    {
+      "id": "AG-003",
+      "body": "细瓷坯",
+      "recipe": "稻灰40 长石40 石英18 红土2",
+      "ashSource": "东北稻灰",
+      "glazeThickness": "0.6mm",
+      "kiln": "K-1",
+      "firingCurve": [],
+      "peakTemp": 1260,
+      "color": "月白",
+      "defects": "",
+      "score": 85,
+      "observations": [
+        {
+          "at": "2026-05-15",
+          "note": "釉面光泽度好"
+        }
+      ],
+      "recipeVersionId": "RCV-0003"
+    },
+    {
+      "id": "AG-004",
+      "body": "粗陶坯",
+      "recipe": "竹灰42 长石35 石英18 红土5",
+      "ashSource": "莫干山竹灰",
+      "glazeThickness": "0.9mm",
+      "kiln": "K-2",
+      "firingCurve": [],
+      "peakTemp": 1235,
+      "color": "灰青",
+      "defects": "",
+      "score": 80,
+      "observations": [],
+      "recipeVersionId": "RCV-0004"
+    },
+    {
+      "id": "AG-005",
+      "body": "细瓷坯",
+      "recipe": "木灰50 长石30 石英18 高岭2",
+      "ashSource": "果木灰",
+      "glazeThickness": "0.7mm",
+      "kiln": "K-1",
+      "firingCurve": [],
+      "peakTemp": 1250,
+      "color": "乳白",
+      "defects": "",
+      "score": 88,
+      "observations": [
+        {
+          "at": "2026-05-10",
+          "note": "还原气氛，釉色温润"
+        }
+      ],
+      "recipeVersionId": "RCV-0005"
+    },
+    {
+      "id": "AG-006",
+      "body": "粗陶坯",
+      "recipe": "松灰38 长石38 石英20 红土4",
+      "ashSource": "北山松灰",
+      "glazeThickness": "0.8mm",
+      "kiln": "K-3",
+      "firingCurve": [],
+      "peakTemp": 1255,
+      "color": "酱褐带窑变",
+      "defects": "缩釉",
+      "score": 72,
+      "observations": [
+        {
+          "at": "2026-05-05",
+          "note": "柴窑烧成，气氛波动大"
+        }
+      ],
+      "recipeVersionId": "RCV-0006"
+    },
+    {
+      "id": "AG-007",
+      "body": "紫砂坯",
+      "recipe": "松灰42 长石35 石英18 红土5",
+      "ashSource": "南山松灰",
+      "glazeThickness": "0.8mm",
+      "kiln": "K-2",
+      "firingCurve": [],
+      "peakTemp": 1245,
+      "color": "青灰带油滴",
+      "defects": "边缘流釉",
+      "score": 79,
+      "observations": [],
+      "recipeVersionId": "RCV-0001"
+    },
+    {
+      "id": "AG-008",
+      "body": "粗陶坯",
+      "recipe": "稻灰42 长石35 石英18 红土5",
+      "ashSource": "东北稻灰",
+      "glazeThickness": "0.8mm",
+      "kiln": "K-2",
+      "firingCurve": [],
+      "peakTemp": 1242,
+      "color": "青灰",
+      "defects": "气泡",
+      "score": 68,
+      "observations": [
+        {
+          "at": "2026-04-28",
+          "note": "升温过快导致气泡"
+        }
+      ],
+      "recipeVersionId": "RCV-0007"
+    },
+    {
+      "id": "AG-009",
+      "body": "细瓷坯",
+      "recipe": "松灰42 长石35 石英18 红土5",
+      "ashSource": "南山松灰",
+      "glazeThickness": "0.7mm",
+      "kiln": "K-1",
+      "firingCurve": [],
+      "peakTemp": 1238,
+      "color": "青白",
+      "defects": "",
+      "score": 86,
+      "observations": [],
+      "recipeVersionId": "RCV-0001"
+    },
+    {
+      "id": "AG-010",
+      "body": "粗陶坯",
+      "recipe": "木灰42 长石35 石英18 高岭5",
+      "ashSource": "果木灰",
+      "glazeThickness": "1.0mm",
+      "kiln": "K-2",
+      "firingCurve": [],
+      "peakTemp": 1248,
+      "color": "乳浊青灰",
+      "defects": "针孔",
+      "score": 75,
+      "observations": [
+        {
+          "at": "2026-04-20",
+          "note": "配方调整，高岭替换红土"
+        }
+      ],
+      "recipeVersionId": "RCV-0008"
+    },
+    {
+      "id": "AG-011",
+      "body": "粗陶坯",
+      "recipe": "竹灰40 长石40 石英15 红土5",
+      "ashSource": "莫干山竹灰",
+      "glazeThickness": "0.8mm",
+      "kiln": "K-3",
+      "firingCurve": [],
+      "peakTemp": 1265,
+      "color": "灰褐",
+      "defects": "开裂",
+      "score": 60,
+      "observations": [
+        {
+          "at": "2026-04-15",
+          "note": "温度偏高，坯釉膨胀系数不匹配"
+        }
+      ],
+      "recipeVersionId": "RCV-0009"
+    },
+    {
+      "id": "AG-012",
+      "body": "细瓷坯",
+      "recipe": "稻灰50 长石25 石英20 高岭5",
+      "ashSource": "东北稻灰",
+      "glazeThickness": "0.6mm",
+      "kiln": "K-1",
+      "firingCurve": [],
+      "peakTemp": 1258,
+      "color": "月白微青",
+      "defects": "",
+      "score": 90,
+      "observations": [
+        {
+          "at": "2026-04-10",
+          "note": "最佳配方，釉色温润如玉"
+        }
+      ],
+      "recipeVersionId": "RCV-0010"
     }
   ],
   "firingPlans": [],
@@ -87,6 +292,78 @@
     {
       "id": "RC-001",
       "name": "南山松灰配方",
+      "description": "从历史试片数据自动迁移生成",
+      "createdAt": "2026-06-20",
+      "updatedAt": "2026-06-20",
+      "migratedFromTiles": true
+    },
+    {
+      "id": "RC-002",
+      "name": "南山松灰配方",
+      "description": "从历史试片数据自动迁移生成",
+      "createdAt": "2026-06-20",
+      "updatedAt": "2026-06-20",
+      "migratedFromTiles": true
+    },
+    {
+      "id": "RC-003",
+      "name": "东北稻灰配方",
+      "description": "从历史试片数据自动迁移生成",
+      "createdAt": "2026-06-20",
+      "updatedAt": "2026-06-20",
+      "migratedFromTiles": true
+    },
+    {
+      "id": "RC-004",
+      "name": "莫干山竹灰配方",
+      "description": "从历史试片数据自动迁移生成",
+      "createdAt": "2026-06-20",
+      "updatedAt": "2026-06-20",
+      "migratedFromTiles": true
+    },
+    {
+      "id": "RC-005",
+      "name": "果木灰配方",
+      "description": "从历史试片数据自动迁移生成",
+      "createdAt": "2026-06-20",
+      "updatedAt": "2026-06-20",
+      "migratedFromTiles": true
+    },
+    {
+      "id": "RC-006",
+      "name": "北山松灰配方",
+      "description": "从历史试片数据自动迁移生成",
+      "createdAt": "2026-06-20",
+      "updatedAt": "2026-06-20",
+      "migratedFromTiles": true
+    },
+    {
+      "id": "RC-007",
+      "name": "东北稻灰配方",
+      "description": "从历史试片数据自动迁移生成",
+      "createdAt": "2026-06-20",
+      "updatedAt": "2026-06-20",
+      "migratedFromTiles": true
+    },
+    {
+      "id": "RC-008",
+      "name": "果木灰配方",
+      "description": "从历史试片数据自动迁移生成",
+      "createdAt": "2026-06-20",
+      "updatedAt": "2026-06-20",
+      "migratedFromTiles": true
+    },
+    {
+      "id": "RC-009",
+      "name": "莫干山竹灰配方",
+      "description": "从历史试片数据自动迁移生成",
+      "createdAt": "2026-06-20",
+      "updatedAt": "2026-06-20",
+      "migratedFromTiles": true
+    },
+    {
+      "id": "RC-010",
+      "name": "东北稻灰配方",
       "description": "从历史试片数据自动迁移生成",
       "createdAt": "2026-06-20",
       "updatedAt": "2026-06-20",
@@ -114,6 +391,249 @@
         },
         {
           "name": "红土",
+          "percentage": 5
+        }
+      ],
+      "note": "初始版本，从历史试片数据迁移生成",
+      "createdAt": "2026-06-20",
+      "parentVersionId": null
+    },
+    {
+      "id": "RCV-0002",
+      "recipeId": "RC-002",
+      "version": 1,
+      "text": "松灰45 长石30 石英20 高岭5",
+      "ingredients": [
+        {
+          "name": "松灰",
+          "percentage": 45
+        },
+        {
+          "name": "长石",
+          "percentage": 30
+        },
+        {
+          "name": "石英",
+          "percentage": 20
+        },
+        {
+          "name": "高岭",
+          "percentage": 5
+        }
+      ],
+      "note": "初始版本，从历史试片数据迁移生成",
+      "createdAt": "2026-06-20",
+      "parentVersionId": null
+    },
+    {
+      "id": "RCV-0003",
+      "recipeId": "RC-003",
+      "version": 1,
+      "text": "稻灰40 长石40 石英18 红土2",
+      "ingredients": [
+        {
+          "name": "稻灰",
+          "percentage": 40
+        },
+        {
+          "name": "长石",
+          "percentage": 40
+        },
+        {
+          "name": "石英",
+          "percentage": 18
+        },
+        {
+          "name": "红土",
+          "percentage": 2
+        }
+      ],
+      "note": "初始版本，从历史试片数据迁移生成",
+      "createdAt": "2026-06-20",
+      "parentVersionId": null
+    },
+    {
+      "id": "RCV-0004",
+      "recipeId": "RC-004",
+      "version": 1,
+      "text": "竹灰42 长石35 石英18 红土5",
+      "ingredients": [
+        {
+          "name": "竹灰",
+          "percentage": 42
+        },
+        {
+          "name": "长石",
+          "percentage": 35
+        },
+        {
+          "name": "石英",
+          "percentage": 18
+        },
+        {
+          "name": "红土",
+          "percentage": 5
+        }
+      ],
+      "note": "初始版本，从历史试片数据迁移生成",
+      "createdAt": "2026-06-20",
+      "parentVersionId": null
+    },
+    {
+      "id": "RCV-0005",
+      "recipeId": "RC-005",
+      "version": 1,
+      "text": "木灰50 长石30 石英18 高岭2",
+      "ingredients": [
+        {
+          "name": "木灰",
+          "percentage": 50
+        },
+        {
+          "name": "长石",
+          "percentage": 30
+        },
+        {
+          "name": "石英",
+          "percentage": 18
+        },
+        {
+          "name": "高岭",
+          "percentage": 2
+        }
+      ],
+      "note": "初始版本，从历史试片数据迁移生成",
+      "createdAt": "2026-06-20",
+      "parentVersionId": null
+    },
+    {
+      "id": "RCV-0006",
+      "recipeId": "RC-006",
+      "version": 1,
+      "text": "松灰38 长石38 石英20 红土4",
+      "ingredients": [
+        {
+          "name": "松灰",
+          "percentage": 38
+        },
+        {
+          "name": "长石",
+          "percentage": 38
+        },
+        {
+          "name": "石英",
+          "percentage": 20
+        },
+        {
+          "name": "红土",
+          "percentage": 4
+        }
+      ],
+      "note": "初始版本，从历史试片数据迁移生成",
+      "createdAt": "2026-06-20",
+      "parentVersionId": null
+    },
+    {
+      "id": "RCV-0007",
+      "recipeId": "RC-007",
+      "version": 1,
+      "text": "稻灰42 长石35 石英18 红土5",
+      "ingredients": [
+        {
+          "name": "稻灰",
+          "percentage": 42
+        },
+        {
+          "name": "长石",
+          "percentage": 35
+        },
+        {
+          "name": "石英",
+          "percentage": 18
+        },
+        {
+          "name": "红土",
+          "percentage": 5
+        }
+      ],
+      "note": "初始版本，从历史试片数据迁移生成",
+      "createdAt": "2026-06-20",
+      "parentVersionId": null
+    },
+    {
+      "id": "RCV-0008",
+      "recipeId": "RC-008",
+      "version": 1,
+      "text": "木灰42 长石35 石英18 高岭5",
+      "ingredients": [
+        {
+          "name": "木灰",
+          "percentage": 42
+        },
+        {
+          "name": "长石",
+          "percentage": 35
+        },
+        {
+          "name": "石英",
+          "percentage": 18
+        },
+        {
+          "name": "高岭",
+          "percentage": 5
+        }
+      ],
+      "note": "初始版本，从历史试片数据迁移生成",
+      "createdAt": "2026-06-20",
+      "parentVersionId": null
+    },
+    {
+      "id": "RCV-0009",
+      "recipeId": "RC-009",
+      "version": 1,
+      "text": "竹灰40 长石40 石英15 红土5",
+      "ingredients": [
+        {
+          "name": "竹灰",
+          "percentage": 40
+        },
+        {
+          "name": "长石",
+          "percentage": 40
+        },
+        {
+          "name": "石英",
+          "percentage": 15
+        },
+        {
+          "name": "红土",
+          "percentage": 5
+        }
+      ],
+      "note": "初始版本，从历史试片数据迁移生成",
+      "createdAt": "2026-06-20",
+      "parentVersionId": null
+    },
+    {
+      "id": "RCV-0010",
+      "recipeId": "RC-010",
+      "version": 1,
+      "text": "稻灰50 长石25 石英20 高岭5",
+      "ingredients": [
+        {
+          "name": "稻灰",
+          "percentage": 50
+        },
+        {
+          "name": "长石",
+          "percentage": 25
+        },
+        {
+          "name": "石英",
+          "percentage": 20
+        },
+        {
+          "name": "高岭",
           "percentage": 5
         }
       ],
