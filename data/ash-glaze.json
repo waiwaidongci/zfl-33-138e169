@@ -81,5 +81,26 @@
       "createdAt": "2026-06-20",
       "parentVersionId": null
     }
+  ],
+  "batches": [
+    {
+      "id": "BATCH-001",
+      "name": "K-2还原气氛松灰釉实验",
+      "kiln": "K-2",
+      "plannedDate": "2026-06-25",
+      "targetAtmosphere": "还原",
+      "tileIds": [
+        "AG-001"
+      ],
+      "status": "loading",
+      "observations": [
+        {
+          "at": "2026-06-20",
+          "note": "开始装窑"
+        }
+      ],
+      "createdAt": "2026-06-20",
+      "updatedAt": "2026-06-20"
+    }
   ]
 }

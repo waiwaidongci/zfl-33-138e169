@@ -31,6 +31,16 @@ import {
   handleGetRecipeReport,
   handleGetVersionReport
 } from "./lib/recipe-routes.js";
+import {
+  handleListBatches,
+  handleCreateBatch,
+  handleGetBatch,
+  handleAddBatchTiles,
+  handleRemoveBatchTiles,
+  handleAdvanceBatchStatus,
+  handleAddBatchObservation,
+  handleGetBatchSummary
+} from "./lib/batch-routes.js";
 
 const port = Number(process.env.PORT || 3033);
 
@@ -186,6 +196,55 @@ const server = http.createServer(async (req, res) => {
     }
     if (recipeMatch && req.method === "DELETE") {
       const r = await handleDeleteRecipe(recipeMatch[1], db);
+      return send(res, r.status, r.data);
+    }
+
+    const batchSummaryMatch = url.pathname.match(/^\/batches\/([^/]+)\/summary$/);
+    if (batchSummaryMatch && req.method === "GET") {
+      const r = await handleGetBatchSummary(batchSummaryMatch[1], db);
+      return send(res, r.status, r.data);
+    }
+
+    const batchObsMatch = url.pathname.match(/^\/batches\/([^/]+)\/observations$/);
+    if (batchObsMatch && req.method === "POST") {
+      const input = await readJsonBody(req);
+      const r = await handleAddBatchObservation(batchObsMatch[1], input, db);
+      return send(res, r.status, r.data);
+    }
+
+    const batchStatusMatch = url.pathname.match(/^\/batches\/([^/]+)\/status$/);
+    if (batchStatusMatch && req.method === "PATCH") {
+      const input = await readJsonBody(req);
+      const r = await handleAdvanceBatchStatus(batchStatusMatch[1], input, db);
+      return send(res, r.status, r.data);
+    }
+
+    const batchTilesMatch = url.pathname.match(/^\/batches\/([^/]+)\/tiles$/);
+    if (batchTilesMatch && req.method === "POST") {
+      const input = await readJsonBody(req);
+      const r = await handleAddBatchTiles(batchTilesMatch[1], input, db);
+      return send(res, r.status, r.data);
+    }
+    if (batchTilesMatch && req.method === "DELETE") {
+      const input = await readJsonBody(req);
+      const r = await handleRemoveBatchTiles(batchTilesMatch[1], input, db);
+      return send(res, r.status, r.data);
+    }
+
+    if (req.method === "GET" && url.pathname === "/batches") {
+      const r = await handleListBatches(url, db);
+      return send(res, r.status, r.data);
+    }
+
+    if (req.method === "POST" && url.pathname === "/batches") {
+      const input = await readJsonBody(req);
+      const r = await handleCreateBatch(input, db);
+      return send(res, r.status, r.data);
+    }
+
+    const batchMatch = url.pathname.match(/^\/batches\/([^/]+)$/);
+    if (batchMatch && req.method === "GET") {
+      const r = await handleGetBatch(batchMatch[1], db);
       return send(res, r.status, r.data);
     }
 
