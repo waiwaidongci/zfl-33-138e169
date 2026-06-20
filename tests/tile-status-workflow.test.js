@@ -943,6 +943,173 @@ async function test9_legacy_entry_guards() {
   assert(Array.isArray(newTile.statusHistory), "创建试片有状态历史记录");
 }
 
+async function test11_batch_usage_summary() {
+  console.log("\nTest 11: 原料批号使用摘要接口");
+
+  await setupMigratedDb();
+
+  const { loadDb, saveDb, getCollections } = await import("../lib/db.js");
+  const { handleBatchUsageSummary } = await import("../lib/inventory-routes.js");
+  const { TILE_STATUSES } = await import("../lib/tile-status-machine.js");
+
+  const db = await loadDb();
+  const coll = getCollections(db);
+
+  console.log("  11.1 不存在的批号返回 404");
+  const notFoundResult = await handleBatchUsageSummary("NON-EXISTENT-BATCH", db);
+  assertEq(notFoundResult.status, 404, "不存在的批号返回 404");
+  assertEq(notFoundResult.data.error, "batch_not_found", "错误类型正确");
+
+  console.log("  11.2 无使用记录的批号返回空摘要");
+  const noUsageResult = await handleBatchUsageSummary("SG-2026-001", db);
+  assertEq(noUsageResult.status, 200, "无使用记录的批号返回 200");
+  assertEq(noUsageResult.data.batchNo, "SG-2026-001", "批号正确");
+  assertEq(noUsageResult.data.materialName, "松灰", "原料名称正确");
+  assertEq(noUsageResult.data.currentStock, 50, "当前库存正确");
+  assertEq(noUsageResult.data.reorderThreshold, 0, "预警阈值正确");
+  assertEq(noUsageResult.data.tileCount, 0, "引用试片数为 0");
+  assertEq(noUsageResult.data.totalUsed, 0, "累计使用量为 0");
+  assert(Array.isArray(noUsageResult.data.tiles), "tiles 是数组");
+  assertEq(noUsageResult.data.tiles.length, 0, "tiles 数组为空");
+  assert(Array.isArray(noUsageResult.data.consumptionByIngredient), "consumptionByIngredient 是数组");
+  assertEq(noUsageResult.data.consumptionByIngredient.length, 0, "consumptionByIngredient 数组为空");
+  assert(noUsageResult.data.isLowStock === false, "isLowStock 为 false");
+
+  console.log("  11.3 多试片共用同一批号的使用摘要");
+  coll.tiles.push({
+    id: "AG-SUMMARY-001",
+    body: "粗陶坯",
+    recipe: "松灰42 长石35 石英18 红土5",
+    ashSource: "南山松灰",
+    kiln: "K-2",
+    peakTemp: 1240,
+    color: "青灰",
+    score: 82,
+    status: TILE_STATUSES.FIRED,
+    statusHistory: [],
+    batchId: null,
+    inventoryDeducted: true,
+    defectTags: [],
+    observations: [],
+    batchWeight: 10,
+    materialBatchRefs: [
+      { ingredientName: "松灰", batchNo: "SG-2026-001", deducted: 4.2, unit: "kg" },
+      { ingredientName: "长石", batchNo: "CS-2026-001", deducted: 3.5, unit: "kg" },
+      { ingredientName: "石英", batchNo: "SY-2026-001", deducted: 1.8, unit: "kg" },
+      { ingredientName: "红土", batchNo: "HT-2026-001", deducted: 0.5, unit: "kg" }
+    ]
+  });
+
+  coll.tiles.push({
+    id: "AG-SUMMARY-002",
+    body: "细瓷坯",
+    recipe: "松灰50 长石30 石英20",
+    ashSource: "南山松灰",
+    kiln: "K-2",
+    peakTemp: 1250,
+    color: "月白",
+    score: 88,
+    status: TILE_STATUSES.DRAFT,
+    statusHistory: [],
+    batchId: null,
+    inventoryDeducted: false,
+    defectTags: [],
+    observations: [],
+    batchWeight: 5,
+    materialBatchRefs: [
+      { ingredientName: "松灰", batchNo: "SG-2026-001", deducted: 2.5, unit: "kg" },
+      { ingredientName: "长石", batchNo: "CS-2026-001", deducted: 1.5, unit: "kg" },
+      { ingredientName: "石英", batchNo: "SY-2026-001", deducted: 1.0, unit: "kg" }
+    ]
+  });
+
+  coll.tiles.push({
+    id: "AG-SUMMARY-003",
+    body: "粗陶坯",
+    recipe: "松灰45 长石40 红土15",
+    ashSource: "莫干山竹灰",
+    kiln: "K-3",
+    peakTemp: 1260,
+    color: "",
+    score: 0,
+    status: TILE_STATUSES.PENDING_FIRING,
+    statusHistory: [],
+    batchId: null,
+    inventoryDeducted: true,
+    defectTags: [],
+    observations: [],
+    batchWeight: 8,
+    materialBatchRefs: [
+      { ingredientName: "松灰", batchNo: "SG-2026-001", deducted: 3.6, unit: "kg" },
+      { ingredientName: "长石", batchNo: "CS-2026-001", deducted: 3.2, unit: "kg" },
+      { ingredientName: "红土", batchNo: "HT-2026-001", deducted: 1.2, unit: "kg" }
+    ]
+  });
+
+  await saveDb(db);
+
+  const multiTileResult = await handleBatchUsageSummary("SG-2026-001", db);
+  assertEq(multiTileResult.status, 200, "多试片共用批号返回 200");
+  assertEq(multiTileResult.data.batchNo, "SG-2026-001", "批号正确");
+  assertEq(multiTileResult.data.materialName, "松灰", "原料名称正确");
+  assertEq(multiTileResult.data.tileCount, 3, "引用试片数为 3");
+  assertEq(multiTileResult.data.totalUsed, 10.3, "累计使用量正确：4.2+2.5+3.6=10.3");
+  assertEq(multiTileResult.data.tiles.length, 3, "tiles 数组有 3 条记录");
+
+  const tile001 = multiTileResult.data.tiles.find(t => t.tileId === "AG-SUMMARY-001");
+  assert(tile001, "AG-SUMMARY-001 在 tiles 中");
+  assertEq(tile001.ingredientName, "松灰", "成分名称正确");
+  assertEq(tile001.deducted, 4.2, "扣用量正确");
+  assertEq(tile001.batchWeight, 10, "批次重量正确");
+  assertEq(tile001.status, TILE_STATUSES.FIRED, "状态正确");
+
+  const tile002 = multiTileResult.data.tiles.find(t => t.tileId === "AG-SUMMARY-002");
+  assert(tile002, "AG-SUMMARY-002 在 tiles 中");
+  assertEq(tile002.deducted, 2.5, "AG-SUMMARY-002 扣用量正确");
+  assertEq(tile002.status, TILE_STATUSES.DRAFT, "状态正确");
+
+  const tile003 = multiTileResult.data.tiles.find(t => t.tileId === "AG-SUMMARY-003");
+  assert(tile003, "AG-SUMMARY-003 在 tiles 中");
+  assertEq(tile003.deducted, 3.6, "AG-SUMMARY-003 扣用量正确");
+  assertEq(tile003.status, TILE_STATUSES.PENDING_FIRING, "状态正确");
+
+  assertEq(multiTileResult.data.consumptionByIngredient.length, 1, "按成分汇总只有 1 种成分");
+  const ingredientSummary = multiTileResult.data.consumptionByIngredient[0];
+  assertEq(ingredientSummary.ingredientName, "松灰", "成分名称正确");
+  assertEq(ingredientSummary.totalDeducted, 10.3, "总扣用量正确");
+  assertEq(ingredientSummary.tileCount, 3, "引用试片数正确");
+  assertEq(ingredientSummary.unit, "kg", "单位正确");
+
+  console.log("  11.4 低库存标识正确");
+  const lowStockBatch = coll.materialStocks.find(s => s.batchNo === "SG-2026-001");
+  lowStockBatch.reorderThreshold = 50;
+  lowStockBatch.quantity = 39.7;
+  await saveDb(db);
+
+  const lowStockResult = await handleBatchUsageSummary("SG-2026-001", db);
+  assertEq(lowStockResult.status, 200, "低库存查询返回 200");
+  assert(lowStockResult.data.isLowStock === true, "isLowStock 为 true（39.7 <= 50）");
+  assertEq(lowStockResult.data.reorderThreshold, 50, "预警阈值正确");
+
+  console.log("  11.5 验证完整返回结构");
+  const fullResult = await handleBatchUsageSummary("CS-2026-001", db);
+  assertEq(fullResult.status, 200, "长石批号查询返回 200");
+  assertEq(fullResult.data.materialName, "长石", "原料名称正确");
+  assertEq(fullResult.data.unit, "kg", "单位正确");
+  assertEq(fullResult.data.tileCount, 3, "长石被 3 个试片引用");
+  assertEq(fullResult.data.totalUsed, 8.2, "长石总用量：3.5+1.5+3.2=8.2");
+  assertEq(fullResult.data.consumptionByIngredient[0].totalDeducted, 8.2, "成分汇总总用量正确");
+
+  assert("currentStock" in fullResult.data, "包含 currentStock 字段");
+  assert("reorderThreshold" in fullResult.data, "包含 reorderThreshold 字段");
+  assert("isLowStock" in fullResult.data, "包含 isLowStock 字段");
+  assert("supplier" in fullResult.data, "包含 supplier 字段");
+  assert("entryDate" in fullResult.data, "包含 entryDate 字段");
+  assert("totalUsed" in fullResult.data, "包含 totalUsed 字段");
+  assert("tiles" in fullResult.data, "包含 tiles 字段");
+  assert("consumptionByIngredient" in fullResult.data, "包含 consumptionByIngredient 字段");
+}
+
 async function run() {
   try {
     await setupTestEnv();
@@ -957,6 +1124,7 @@ async function run() {
     await test8_api_routes_and_filters();
     await test9_legacy_entry_guards();
     await test10_tile_list_advanced_filters();
+    await test11_batch_usage_summary();
 
     console.log(`\n========== Results: ${passed} passed, ${failed} failed ==========`);
     if (failed > 0) {

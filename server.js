@@ -51,7 +51,8 @@ import {
   handleUpdateInventory,
   handleDeleteInventory,
   handleInventorySummary,
-  handleBatchNoTiles
+  handleBatchNoTiles,
+  handleBatchUsageSummary
 } from "./lib/inventory-routes.js";
 import {
   handleGetDefectCatalog,
@@ -346,6 +347,12 @@ const server = http.createServer(async (req, res) => {
     const inventoryBatchNoTilesMatch = url.pathname.match(/^\/inventory\/batch-no\/([^/]+)\/tiles$/);
     if (inventoryBatchNoTilesMatch && req.method === "GET") {
       const r = await handleBatchNoTiles(decodeURIComponent(inventoryBatchNoTilesMatch[1]), db);
+      return send(res, r.status, r.data);
+    }
+
+    const inventoryBatchSummaryMatch = url.pathname.match(/^\/inventory\/batch-no\/([^/]+)\/summary$/);
+    if (inventoryBatchSummaryMatch && req.method === "GET") {
+      const r = await handleBatchUsageSummary(decodeURIComponent(inventoryBatchSummaryMatch[1]), db);
       return send(res, r.status, r.data);
     }
 

@@ -171,6 +171,14 @@ export function validate(db) {
 | PATCH | `/batches/:id/status` | 推进批次状态 |
 | POST | `/batches/:id/observations` | 添加批次观察记录 |
 | GET | `/batches/:id/summary` | 生成批次结果摘要 |
+| GET | `/inventory?name=&batchNo=&lowStock=` | 查询原料库存列表 |
+| POST | `/inventory` | 新增原料库存记录 |
+| GET | `/inventory/summary` | 原料库存汇总（按原料名称分组） |
+| GET | `/inventory/:id` | 查询单条库存记录 |
+| PATCH | `/inventory/:id` | 更新库存记录 |
+| DELETE | `/inventory/:id` | 删除库存记录 |
+| GET | `/inventory/batch-no/:batchNo/tiles` | 查询引用指定批号的所有试片 |
+| GET | `/inventory/batch-no/:batchNo/summary` | 单个原料批号使用摘要 |
 
 ---
 
@@ -793,6 +801,139 @@ curl -X POST http://localhost:3033/batches/BATCH-001/observations \
 ```bash
 curl http://localhost:3033/batches/BATCH-001/summary
 ```
+
+---
+
+## 原料库存模块
+
+### 模块概述
+
+原料库存模块用于管理釉方原料的入库、库存预警、批号追踪以及原料消耗统计。系统支持按原料名称、批号过滤，低库存预警，并提供原料批号与试片的关联追踪。
+
+### 库存字段定义
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | string | 库存记录唯一编号，自动生成 `MAT-001` 形式 |
+| name | string | 原料名称 |
+| batchNo | string | 原料批号，唯一 |
+| quantity | number | 当前库存数量 |
+| unit | string | 计量单位，默认 `kg` |
+| entryDate | string | 入库日期 |
+| supplier | string | 供应商 |
+| reorderThreshold | number | 预警阈值，库存低于此值触发低库存预警 |
+| notes | string | 备注 |
+| createdAt | string | 创建日期 |
+| updatedAt | string | 更新日期 |
+
+### 1. 查询库存列表
+
+`GET /inventory?name=&batchNo=&lowStock=`
+
+支持查询参数：
+- `name`：按原料名称精确匹配
+- `batchNo`：按批号精确匹配
+- `lowStock`：设为 `true` 仅返回库存低于预警阈值的记录
+
+```bash
+curl "http://localhost:3033/inventory?lowStock=true"
+```
+
+### 2. 新增库存记录
+
+`POST /inventory`
+
+```bash
+curl -X POST http://localhost:3033/inventory \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "长石",
+    "batchNo": "CS-2026-002",
+    "quantity": 100,
+    "unit": "kg",
+    "reorderThreshold": 20,
+    "supplier": "景德镇陶瓷原料厂"
+  }'
+```
+
+### 3. 库存汇总
+
+`GET /inventory/summary`
+
+按原料名称分组汇总，显示各原料总库存量和所有批次信息。
+
+```bash
+curl http://localhost:3033/inventory/summary
+```
+
+### 4. 查询引用指定批号的试片
+
+`GET /inventory/batch-no/:batchNo/tiles`
+
+返回所有使用了该原料批号的试片列表。
+
+```bash
+curl http://localhost:3033/inventory/batch-no/CS-2026-001/tiles
+```
+
+### 5. 单个原料批号使用摘要
+
+`GET /inventory/batch-no/:batchNo/summary`
+
+返回指定原料批号的完整使用摘要，包含：
+
+- 当前库存、预警阈值、是否低库存
+- 被哪些试片引用，每个试片扣用量
+- 按配方成分汇总的消耗量
+
+#### 返回字段说明
+
+```jsonc
+{
+  "batchNo": "SG-2026-001",              // 原料批号
+  "materialName": "松灰",                 // 原料名称
+  "unit": "kg",                           // 计量单位
+  "currentStock": 45.8,                   // 当前库存
+  "reorderThreshold": 10,                 // 预警阈值
+  "supplier": "南山林场",                 // 供应商
+  "entryDate": "2026-05-15",              // 入库日期
+  "isLowStock": false,                    // 是否低于预警阈值
+  "totalUsed": 4.2,                       // 累计使用量
+  "tileCount": 2,                         // 引用试片数量
+  "tiles": [                              // 各试片扣用详情
+    {
+      "tileId": "AG-001",
+      "body": "粗陶坯",
+      "recipe": "松灰42 长石35 石英18 红土5",
+      "batchWeight": 10,
+      "ingredientName": "松灰",
+      "deducted": 4.2,
+      "unit": "kg",
+      "status": "fired"
+    }
+  ],
+  "consumptionByIngredient": [            // 按配方成分汇总消耗
+    {
+      "ingredientName": "松灰",
+      "totalDeducted": 4.2,
+      "unit": "kg",
+      "tileCount": 2
+    }
+  ]
+}
+```
+
+#### 示例
+
+```bash
+curl http://localhost:3033/inventory/batch-no/SG-2026-001/summary
+```
+
+#### 错误响应
+
+| HTTP 状态码 | error 字段 | 触发条件 |
+|-------------|------------|----------|
+| 404 | `batch_not_found` | 指定的批号不存在 |
 
 ---
 
