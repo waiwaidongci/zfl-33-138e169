@@ -32,9 +32,11 @@ npm start
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 3,
   "migrations": [
-    { "version": 1, "name": "introduce-schema-version", "appliedAt": "2026-..." }
+    { "version": 1, "name": "introduce-schema-version", "appliedAt": "2026-..." },
+    { "version": 2, "name": "add-tile-status-fields", "appliedAt": "2026-..." },
+    { "version": 3, "name": "add-inventory-reservation", "appliedAt": "2026-..." }
   ],
   "collections": {
     "tiles": [...],
@@ -42,7 +44,8 @@ npm start
     "recipes": [...],
     "recipeVersions": [...],
     "batches": [...],
-    "materialStocks": [...]
+    "materialStocks": [...],
+    "inventoryTransactions": [...]
   }
 }
 ```
@@ -179,6 +182,8 @@ export function validate(db) {
 | DELETE | `/inventory/:id` | 删除库存记录 |
 | GET | `/inventory/batch-no/:batchNo/tiles` | 查询引用指定批号的所有试片 |
 | GET | `/inventory/batch-no/:batchNo/summary` | 单个原料批号使用摘要 |
+| GET | `/inventory/transactions/tile/:tileId` | 查询指定试片的库存流水 |
+| GET | `/inventory/transactions/stock/:stockId` | 查询指定库存记录的流水 |
 | GET | `/dashboard/overview?daysBack=&lowScoreThreshold=&lowScoreLimit=&recentObsLimit=&ashSource=&kiln=` | 仪表盘总览 |
 | GET | `/dashboard/summary?ashSource=&kiln=` | 核心指标汇总 |
 | GET | `/dashboard/recent-observations?daysBack=&limit=&ashSource=&kiln=` | 近期观察记录 |

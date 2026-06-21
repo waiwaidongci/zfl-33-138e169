@@ -236,10 +236,10 @@ async function test3_data_migration() {
 
   const result = await migrateToLatest({ autoBackup: false });
   assert(result.success, "迁移执行成功");
-  assertEq(result.toVersion, 2, "迁移后 schemaVersion 为 2");
+  assertEq(result.toVersion, 3, "迁移后 schemaVersion 为 3");
 
   const db = await loadDb();
-  assertEq(getSchemaVersion(db), 2, "数据库 schemaVersion 为 2");
+  assertEq(getSchemaVersion(db), 3, "数据库 schemaVersion 为 3");
 
   const coll = getCollections(db);
   assertEq(coll.tiles.length, 2, "迁移后 tiles 数量正确");
@@ -368,7 +368,8 @@ async function test5_normal_workflow() {
   assert(trans1.data.statusRecord.note === "准备入窑", "note 正确记录");
 
   const tileAfterTrans1 = coll.tiles.find(t => t.id === "AG-WORKFLOW-001");
-  assert(tileAfterTrans1.inventoryDeducted === true, "库存已扣减");
+  assert(tileAfterTrans1.inventoryReserved === true, "库存已预留");
+  assert(tileAfterTrans1.inventoryDeducted === true, "inventoryDeducted 兼容字段同步更新");
 
   const trans2 = await handleTransitionStatus("AG-WORKFLOW-001", {
     targetStatus: TILE_STATUSES.DRAFT,
@@ -376,7 +377,8 @@ async function test5_normal_workflow() {
     note: "配方需要调整，退回草稿"
   }, db);
   assertEq(trans2.status, 200, "待烧成 -> 草稿 成功（回退）");
-  assert(tileAfterTrans1.inventoryDeducted === false, "库存已恢复");
+  assert(tileAfterTrans1.inventoryReserved === false, "预留已释放");
+  assert(tileAfterTrans1.inventoryDeducted === false, "inventoryDeducted 兼容字段同步更新");
 
   const trans3 = await handleTransitionStatus("AG-WORKFLOW-001", {
     targetStatus: TILE_STATUSES.PENDING_FIRING,
