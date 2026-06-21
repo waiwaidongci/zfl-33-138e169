@@ -73,7 +73,8 @@ import {
   handleGetRecentObservations,
   handleGetAshSourceScores,
   handleGetDefectsByPeakTemp,
-  handleGetLowScoreTiles
+  handleGetLowScoreTiles,
+  handleGetDashboardCompare
 } from "./lib/dashboard-routes.js";
 import {
   getStatusInfo,
@@ -454,6 +455,11 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === "GET" && url.pathname === "/dashboard/low-score-tiles") {
       const r = await handleGetLowScoreTiles(url, db);
+      return send(res, r.status, r.data);
+    }
+
+    if (req.method === "GET" && url.pathname === "/dashboard/compare") {
+      const r = await handleGetDashboardCompare(url, db);
       return send(res, r.status, r.data);
     }
 

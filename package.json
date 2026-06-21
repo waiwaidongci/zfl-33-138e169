@@ -14,6 +14,7 @@
     "test:status": "node tests/tile-status-workflow.test.js",
     "test:import": "node tests/import-enhanced.test.js",
     "test:batch-apply": "node tests/firing-plan-batch-apply.test.js",
-    "test:all": "node tests/migration.test.js && node tests/tile-status-workflow.test.js && node tests/import-enhanced.test.js && node tests/firing-plan-batch-apply.test.js"
+    "test:compare": "node tests/dashboard-compare.test.js",
+    "test:all": "node tests/migration.test.js && node tests/tile-status-workflow.test.js && node tests/import-enhanced.test.js && node tests/firing-plan-batch-apply.test.js && node tests/dashboard-compare.test.js"
   }
 }

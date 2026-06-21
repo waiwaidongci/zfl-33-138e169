@@ -179,6 +179,13 @@ export function validate(db) {
 | DELETE | `/inventory/:id` | 删除库存记录 |
 | GET | `/inventory/batch-no/:batchNo/tiles` | 查询引用指定批号的所有试片 |
 | GET | `/inventory/batch-no/:batchNo/summary` | 单个原料批号使用摘要 |
+| GET | `/dashboard/overview?daysBack=&lowScoreThreshold=&lowScoreLimit=&recentObsLimit=&ashSource=&kiln=` | 仪表盘总览 |
+| GET | `/dashboard/summary?ashSource=&kiln=` | 核心指标汇总 |
+| GET | `/dashboard/recent-observations?daysBack=&limit=&ashSource=&kiln=` | 近期观察记录 |
+| GET | `/dashboard/ash-source-scores?ashSource=&kiln=` | 按灰源分组评分 |
+| GET | `/dashboard/defects-by-peak-temp?ashSource=&kiln=` | 按温度区间缺陷分布 |
+| GET | `/dashboard/low-score-tiles?threshold=&limit=&ashSource=&kiln=` | 低分样砖预警 |
+| GET | `/dashboard/compare?baselineType=&baselineValue=&targetType=&targetValue=&lowScoreThreshold=` | **两个scope对比分析**（新增） |
 
 ---
 
@@ -1328,3 +1335,175 @@ curl -X POST http://localhost:3033/tiles/similar \
 | 1 ~ 20℃ | 非常接近 |
 | 21 ~ 50℃ | 接近 |
 | > 50℃ | 差异较大 |
+
+---
+
+## 仪表盘对比分析模块
+
+### 模块概述
+
+对比分析接口支持按 **灰源(ashSource)、窑炉(kiln)、温度区间(tempRange)** 三个维度任选两个 scope 进行横向对比，输出：
+- 试片数量、已评分数、未评分数
+- 平均分与评分分布（excellent/good/pass/low/unscored）
+- 缺陷率、缺陷总数、每片平均缺陷数
+- 高频缺陷 Top5 及其 baseline/target/delta/deltaPct
+- 严重度分布（轻微/中等/严重）差异
+- 低分样砖（低于阈值）的交集、仅 baseline、仅 target
+
+返回结构严格按照 **baseline、target、delta** 三层组织，可直接用于柱状图、条形图、热力图等可视化渲染。
+
+### 1. 对比分析接口
+
+`GET /dashboard/compare`
+
+#### 查询参数
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `baselineType` | string | ✅ | baseline 维度：`ashSource` / `kiln` / `tempRange` |
+| `baselineValue` | string | ✅ | baseline 值（如 `"南山松灰"`、`"K-1"`、`"1200-1220°C"`） |
+| `targetType` | string | ✅ | target 维度：`ashSource` / `kiln` / `tempRange` |
+| `targetValue` | string | ✅ | target 值 |
+| `lowScoreThreshold` | number | - | 低分样砖阈值，默认 `75`，范围 `0-100` |
+
+> baseline 和 target 的 type **可以不同**（例如 cross-type：灰源 vs 窑炉）。
+
+#### 示例 A：对比两种灰源（南山松灰 vs 东北稻灰）
+
+```bash
+curl "http://localhost:3033/dashboard/compare?baselineType=ashSource&baselineValue=%E5%8D%97%E5%B1%B1%E6%9D%BE%E7%81%B0&targetType=ashSource&targetValue=%E4%B8%9C%E5%8C%97%E7%A8%BB%E7%81%B0"
+```
+
+#### 示例 B：对比两个窑炉（K-1 vs K-2）
+
+```bash
+curl "http://localhost:3033/dashboard/compare?baselineType=kiln&baselineValue=K-1&targetType=kiln&targetValue=K-2"
+```
+
+#### 示例 C：对比两个温度区间（1200-1220°C vs 1240-1260°C）
+
+温度区间取值需与 `getPeakTempRanges()` 完全一致：
+- `< 1200°C`
+- `1200-1220°C`
+- `1220-1240°C`
+- `1240-1260°C`
+- `1260-1280°C`
+- `≥ 1280°C`
+
+```bash
+curl "http://localhost:3033/dashboard/compare?baselineType=tempRange&baselineValue=1200-1220%C2%B0C&targetType=tempRange&targetValue=1240-1260%C2%B0C"
+```
+
+#### 示例 D：跨维度对比 + 自定义低分阈值
+
+```bash
+curl "http://localhost:3033/dashboard/compare?baselineType=ashSource&baselineValue=%E5%8D%97%E5%B1%B1%E6%9D%BE%E7%81%B0&targetType=kiln&targetValue=K-3&lowScoreThreshold=60"
+```
+
+#### 返回结构（节选）
+
+```jsonc
+{
+  "generatedAt": "2026-06-21T00:00:00.000Z",
+  "scope": {
+    "baseline": { "type": "ashSource", "value": "南山松灰", "tileCount": 3 },
+    "target":   { "type": "ashSource", "value": "东北稻灰", "tileCount": 3 },
+    "lowScoreThreshold": 75
+  },
+
+  "baseline": {
+    "tileCount": 3,
+    "scoredCount": 3,
+    "unscoredCount": 0,
+    "averageScore": 71.7,
+    "scoreDistribution": { "excellent": 0, "good": 2, "pass": 0, "low": 1, "unscored": 0 },
+    "tilesWithDefects": 3,
+    "defectRate": 100.0,
+    "totalDefectCount": 6,
+    "averageDefectsPerTile": 2.0,
+    "topDefects": [ { "name": "针孔", "count": 3 }, ... ],
+    "severityCounts": [ { "key": "severe", "label": "严重", "count": 2 }, ... ],
+    "lowScoreTileCount": 1,
+    "lowScoreTiles": [ { "id": "AG-003", "score": 55, "defectCount": 2, "hasSevere": true, ... } ]
+  },
+
+  "target": { /* 与 baseline 同结构 */ },
+
+  "delta": {
+    "tileCount": { "baseline": 3, "target": 3, "delta": 0 },
+    "scoredCount": { "baseline": 3, "target": 3, "delta": 0 },
+    "averageScore": {
+      "baseline": 71.7, "target": 82.7,
+      "delta": 11.0,         // 绝对差值
+      "deltaPct": 15.3       // 相对变化百分比（baseline 为 null/0 时为 null）
+    },
+    "defectRate": {
+      "baseline": 100.0, "target": 66.7,
+      "delta": -33.3, "deltaPct": -33.3
+    },
+    "tilesWithDefects": { "baseline": 3, "target": 2, "delta": -1 },
+    "totalDefectCount":  { "baseline": 6, "target": 3, "delta": -3 },
+    "lowScoreTileCount": { "baseline": 1, "target": 0, "delta": -1 },
+
+    "severityDelta": [
+      { "key": "severe", "label": "严重", "baseline": 2, "target": 0, "delta": -2 }
+    ],
+
+    "topDefectsDelta": [
+      {
+        "name": "针孔",
+        "baseline": 3, "target": 1,
+        "delta": -2,
+        "deltaPct": -66.7     // baseline=0 时为 null
+      }
+    ],
+
+    "lowScoreTilesDiff": {
+      "commonCount": 0,
+      "onlyInBaselineCount": 1,
+      "onlyInTargetCount": 0,
+      "common": [],
+      "onlyInBaseline": [ { "id": "AG-003", "score": 55, ... } ],
+      "onlyInTarget": []
+    },
+
+    "scoreDistribution": {
+      "baseline": { "excellent": 0, "good": 2, "pass": 0, "low": 1, "unscored": 0 },
+      "target":   { "excellent": 2, "good": 1, "pass": 0, "low": 0, "unscored": 0 }
+    }
+  }
+}
+```
+
+#### 前端图表绑定建议
+
+| 图表类型 | 推荐绑定字段 |
+|---------|-------------|
+| 双柱对比图（核心指标） | `delta.tileCount`、`delta.scoredCount`、`delta.averageScore.delta`、`delta.defectRate.delta` |
+| 评分分布堆叠柱 | `delta.scoreDistribution.baseline` vs `.target` |
+| 高频缺陷双向条形图 | `delta.topDefectsDelta[].baseline` / `.target` / `.delta` |
+| 严重度差异雷达图 | `delta.severityDelta[].delta` |
+| 低分样砖交集 Venn | `lowScoreTilesDiff.commonCount` / `onlyInBaselineCount` / `onlyInTargetCount` |
+
+#### 空数据 / 单边无评分 / 缺陷标签缺失 的处理
+
+- **空数据（两边都无匹配试片）**：`baseline.tileCount=0`、`target.tileCount=0`、`averageScore=null`、`topDefects=[]`、`topDefectsDelta=[]`，所有 `delta` 为 `0` 或 `null`（不会抛错）。
+- **单边无评分**：无评分一侧的 `averageScore=null`、`scoredCount=0`、`scoreDistribution.unscored=N`；`delta.averageScore.deltaPct=null`（避免除零），但 `delta` 仍会按 0 兜底计算绝对值。
+- **缺陷标签缺失（`defectTags=null`/`undefined`/空数组/只有 `defects` 文本）**：统一复用 `collectAllTileDefects()` 的行为 — 只认结构化 `defectTags[]`，不认纯文本 `defects`。缺失侧的 `tilesWithDefects=0`、`totalDefectCount=0`、`topDefects=[]`，delta 仍可正确计算差值与百分比（baseline=0 时 `deltaPct=null`）。
+
+### 2. 参数校验与错误码
+
+| HTTP | error 字段 | 触发条件 |
+|------|-----------|---------|
+| 400 | `missing_required` | 缺少 `baselineType` / `baselineValue` / `targetType` / `targetValue`，返回 `required` 数组说明 |
+| 400 | `invalid_baseline_type` | `baselineType` 不是三种合法值之一 |
+| 400 | `invalid_target_type` | `targetType` 不是三种合法值之一 |
+
+---
+
+## 测试命令
+
+| 命令 | 说明 |
+|------|------|
+| `npm run test:compare` | 仅运行仪表盘对比分析测试（10 组用例，覆盖空数据/单边无评分/缺陷标签缺失/跨维度/路由等场景） |
+| `npm run test:all` | 运行全部回归测试（迁移 + 状态机 + 导入 + 批次 + 对比） |
