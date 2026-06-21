@@ -103,435 +103,137 @@ function send(res, status, data) {
   res.end(JSON.stringify(data, null, 2));
 }
 
+const routes = [
+  { method: "GET", path: "/", handler: () => ({ status: 200, data: routesInfo() }) },
+  { method: "GET", path: "/tile-status/info", handler: () => ({ status: 200, data: getStatusInfo() }) },
+  { method: "GET", path: "/tiles", handler: (url, db) => handleListTiles(url, db) },
+  { method: "POST", path: "/tiles", handler: (url, db, input) => handleCreateTile(input, db), needBody: true },
+  { method: "POST", path: "/tiles/similar", handler: (url, db, input) => handleSimilarTiles(input, db), needBody: true },
+  { method: "POST", path: "/tiles/review", handler: (url, db, input) => handlePostExperimentReview(input, db), needBody: true },
+  { method: "POST", path: "/tiles/batch-status", handler: (url, db, input) => handleBatchStatusTransition(input, db), needBody: true },
+  { method: "POST", path: "/import/preview", handler: (url, db, input, req) => handleImportPreview(req), needBody: false, rawHandler: true },
+  { method: "POST", path: "/import/commit", handler: (url, db, input) => handleImportCommit(input, db), needBody: true },
+
+  { method: "POST", pattern: /^\/tiles\/([^/]+)\/observations$/, handler: (url, db, input, req, match) => handleAddObservation(match[1], input, db), needBody: true },
+  { method: "GET", pattern: /^\/tiles\/([^/]+)\/status-history$/, handler: (url, db, input, req, match) => handleGetStatusHistory(match[1], db) },
+  { method: "GET", pattern: /^\/tiles\/([^/]+)\/status$/, handler: (url, db, input, req, match) => handleGetTileStatus(match[1], db) },
+  { method: "PATCH", pattern: /^\/tiles\/([^/]+)\/status$/, handler: (url, db, input, req, match) => handleTransitionStatus(match[1], input, db), needBody: true },
+
+  { method: "GET", pattern: /^\/tiles\/([^/]+)\/defect-tags$/, handler: (url, db, input, req, match) => handleGetTileDefectTags(match[1], db) },
+  { method: "PATCH", pattern: /^\/tiles\/([^/]+)\/defect-tags$/, handler: (url, db, input, req, match) => handleUpdateTileDefectTags(match[1], input, db), needBody: true },
+  { method: "POST", pattern: /^\/tiles\/([^/]+)\/defect-tags$/, handler: (url, db, input, req, match) => handleAddDefectTag(match[1], input, db), needBody: true },
+  { method: "DELETE", pattern: /^\/tiles\/([^/]+)\/defect-tags$/, handler: (url, db, input, req, match) => handleRemoveDefectTag(match[1], input, db), needBody: true },
+
+  { method: "GET", pattern: /^\/tiles\/([^/]+)\/review$/, handler: (url, db, input, req, match) => handleGetExperimentReview(match[1], url, db) },
+  { method: "GET", pattern: /^\/tiles\/([^/]+)$/, handler: (url, db, input, req, match) => handleGetTile(match[1], db) },
+  { method: "PATCH", pattern: /^\/tiles\/([^/]+)$/, handler: (url, db, input, req, match) => handleUpdateTile(match[1], input, db), needBody: true },
+
+  { method: "GET", path: "/reports/recipes", handler: (url, db) => handleRecipesReport(db) },
+
+  { method: "POST", path: "/firing-plans/calculate", handler: (url, db, input) => handleCalcFiringPlan(input, db), needBody: true },
+  { method: "GET", path: "/firing-plans", handler: (url, db) => handleListPlans(url, db) },
+  { method: "POST", path: "/firing-plans", handler: (url, db, input) => handleCreatePlan(input, db), needBody: true },
+  { method: "POST", pattern: /^\/firing-plans\/([^/]+)\/apply$/, handler: (url, db, input, req, match) => handleApplyPlan(match[1], input, db), needBody: true },
+  { method: "GET", pattern: /^\/firing-plans\/([^/]+)$/, handler: (url, db, input, req, match) => handleGetPlan(match[1], db) },
+  { method: "PATCH", pattern: /^\/firing-plans\/([^/]+)$/, handler: (url, db, input, req, match) => handleUpdatePlan(match[1], input, db), needBody: true },
+  { method: "DELETE", pattern: /^\/firing-plans\/([^/]+)$/, handler: (url, db, input, req, match) => handleDeletePlan(match[1], db) },
+
+  { method: "GET", path: "/recipes", handler: (url, db) => handleListRecipes(url, db) },
+  { method: "POST", path: "/recipes", handler: (url, db, input) => handleCreateRecipe(input, db), needBody: true },
+
+  { method: "GET", pattern: /^\/recipes\/([^/]+)\/versions\/diff$/, handler: async (url, db, input, req, match) => {
+    const versionIdA = url.searchParams.get("baseline");
+    const versionIdB = url.searchParams.get("target");
+    if (!versionIdA || !versionIdB) {
+      return {
+        status: 400,
+        data: {
+          error: "missing_required",
+          message: "缺少 baseline 或 target 参数",
+          required: ["baseline", "target"]
+        }
+      };
+    }
+    return handleGetRecipeVersionDiff(match[1], versionIdA, versionIdB, db);
+  }},
+
+  { method: "GET", pattern: /^\/recipes\/([^/]+)\/versions\/([^/]+)\/report$/, handler: (url, db, input, req, match) => handleGetVersionReport(match[1], match[2], db) },
+  { method: "POST", pattern: /^\/recipes\/([^/]+)\/versions\/([^/]+)\/copy$/, handler: (url, db, input, req, match) => handleCopyVersion(match[1], match[2], input, db), needBody: true },
+  { method: "GET", pattern: /^\/recipes\/([^/]+)\/versions\/([^/]+)$/, handler: (url, db, input, req, match) => handleGetVersion(match[1], match[2], db) },
+  { method: "GET", pattern: /^\/recipes\/([^/]+)\/report$/, handler: (url, db, input, req, match) => handleGetRecipeReport(match[1], db) },
+  { method: "GET", pattern: /^\/recipes\/([^/]+)\/versions$/, handler: (url, db, input, req, match) => handleListVersions(match[1], db) },
+  { method: "POST", pattern: /^\/recipes\/([^/]+)\/versions$/, handler: (url, db, input, req, match) => handleCreateVersion(match[1], input, db), needBody: true },
+  { method: "GET", pattern: /^\/recipes\/([^/]+)$/, handler: (url, db, input, req, match) => handleGetRecipe(match[1], db) },
+  { method: "PATCH", pattern: /^\/recipes\/([^/]+)$/, handler: (url, db, input, req, match) => handleUpdateRecipe(match[1], input, db), needBody: true },
+  { method: "DELETE", pattern: /^\/recipes\/([^/]+)$/, handler: (url, db, input, req, match) => handleDeleteRecipe(match[1], db) },
+
+  { method: "GET", pattern: /^\/batches\/([^/]+)\/summary$/, handler: (url, db, input, req, match) => handleGetBatchSummary(match[1], db) },
+  { method: "POST", pattern: /^\/batches\/([^/]+)\/observations$/, handler: (url, db, input, req, match) => handleAddBatchObservation(match[1], input, db), needBody: true },
+  { method: "PATCH", pattern: /^\/batches\/([^/]+)\/status$/, handler: (url, db, input, req, match) => handleAdvanceBatchStatus(match[1], input, db), needBody: true },
+  { method: "POST", pattern: /^\/batches\/([^/]+)\/tiles$/, handler: (url, db, input, req, match) => handleAddBatchTiles(match[1], input, db), needBody: true },
+  { method: "DELETE", pattern: /^\/batches\/([^/]+)\/tiles$/, handler: (url, db, input, req, match) => handleRemoveBatchTiles(match[1], input, db), needBody: true },
+  { method: "GET", path: "/batches", handler: (url, db) => handleListBatches(url, db) },
+  { method: "POST", path: "/batches", handler: (url, db, input) => handleCreateBatch(input, db), needBody: true },
+  { method: "GET", pattern: /^\/batches\/([^/]+)$/, handler: (url, db, input, req, match) => handleGetBatch(match[1], db) },
+
+  { method: "GET", path: "/inventory", handler: (url, db) => handleListInventory(url, db) },
+  { method: "POST", path: "/inventory", handler: (url, db, input) => handleCreateInventory(input, db), needBody: true },
+  { method: "GET", path: "/inventory/summary", handler: (url, db) => handleInventorySummary(db) },
+
+  { method: "GET", pattern: /^\/inventory\/batch-no\/([^/]+)\/tiles$/, handler: (url, db, input, req, match) => handleBatchNoTiles(decodeURIComponent(match[1]), db) },
+  { method: "GET", pattern: /^\/inventory\/batch-no\/([^/]+)\/summary$/, handler: (url, db, input, req, match) => handleBatchUsageSummary(decodeURIComponent(match[1]), db) },
+  { method: "GET", pattern: /^\/inventory\/transactions\/tile\/([^/]+)$/, handler: (url, db, input, req, match) => handleGetTileTransactions(match[1], db) },
+  { method: "GET", pattern: /^\/inventory\/transactions\/stock\/([^/]+)$/, handler: (url, db, input, req, match) => handleGetStockTransactions(match[1], db) },
+  { method: "GET", pattern: /^\/inventory\/([^/]+)$/, handler: (url, db, input, req, match) => handleGetInventory(match[1], db) },
+  { method: "PATCH", pattern: /^\/inventory\/([^/]+)$/, handler: (url, db, input, req, match) => handleUpdateInventory(match[1], input, db), needBody: true },
+  { method: "DELETE", pattern: /^\/inventory\/([^/]+)$/, handler: (url, db, input, req, match) => handleDeleteInventory(match[1], db) },
+
+  { method: "GET", path: "/defects/catalog", handler: () => handleGetDefectCatalog() },
+  { method: "GET", path: "/defects/stats/overall", handler: (url, db) => handleGetOverallDefectStats(db) },
+  { method: "GET", path: "/defects/stats/by-kiln", handler: (url, db) => handleGetDefectStatsByKiln(url, db) },
+  { method: "GET", path: "/defects/stats/by-ash-source", handler: (url, db) => handleGetDefectStatsByAshSource(url, db) },
+  { method: "GET", path: "/defects/high-frequency", handler: (url, db) => handleGetHighFrequencyDefects(url, db) },
+  { method: "GET", path: "/defects/query/tiles", handler: (url, db) => handleQueryTilesByDefect(url, db) },
+  { method: "POST", path: "/defects/migrate", handler: (url, db) => handleRunDefectMigration(db) },
+
+  { method: "GET", path: "/dashboard/overview", handler: (url, db) => handleGetDashboardOverview(url, db) },
+  { method: "GET", path: "/dashboard/summary", handler: (url, db) => handleGetDashboardSummary(url, db) },
+  { method: "GET", path: "/dashboard/recent-observations", handler: (url, db) => handleGetRecentObservations(url, db) },
+  { method: "GET", path: "/dashboard/ash-source-scores", handler: (url, db) => handleGetAshSourceScores(url, db) },
+  { method: "GET", path: "/dashboard/defects-by-peak-temp", handler: (url, db) => handleGetDefectsByPeakTemp(url, db) },
+  { method: "GET", path: "/dashboard/low-score-tiles", handler: (url, db) => handleGetLowScoreTiles(url, db) },
+  { method: "GET", path: "/dashboard/compare", handler: (url, db) => handleGetDashboardCompare(url, db) },
+
+  { method: "GET", path: "/events/types", handler: () => handleGetEventTypes() },
+  { method: "GET", path: "/events/stats", handler: (url, db) => handleGetEventStats(db) },
+  { method: "GET", pattern: /^\/events\/type\/([^/]+)$/, handler: (url, db, input, req, match) => handleGetEventsByType(match[1], url, db) },
+  { method: "GET", pattern: /^\/events\/timeline\/([^/]+)$/, handler: (url, db, input, req, match) => handleGetEntityTimeline(decodeURIComponent(match[1]), url, db) }
+];
+
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host}`);
     const db = await loadDb();
 
-    if (req.method === "GET" && url.pathname === "/") {
-      return send(res, 200, routesInfo());
-    }
+    for (const route of routes) {
+      if (route.method !== req.method) continue;
 
-    if (req.method === "GET" && url.pathname === "/tile-status/info") {
-      return send(res, 200, getStatusInfo());
-    }
-
-    if (req.method === "GET" && url.pathname === "/tiles") {
-      const r = await handleListTiles(url, db);
-      return send(res, r.status, r.data);
-    }
-
-    if (req.method === "POST" && url.pathname === "/tiles") {
-      const input = await readJsonBody(req);
-      const r = await handleCreateTile(input, db);
-      return send(res, r.status, r.data);
-    }
-
-    if (req.method === "POST" && url.pathname === "/tiles/similar") {
-      const input = await readJsonBody(req);
-      const r = await handleSimilarTiles(input, db);
-      return send(res, r.status, r.data);
-    }
-
-    if (req.method === "POST" && url.pathname === "/tiles/review") {
-      const input = await readJsonBody(req);
-      const r = await handlePostExperimentReview(input, db);
-      return send(res, r.status, r.data);
-    }
-
-    if (req.method === "POST" && url.pathname === "/tiles/batch-status") {
-      const input = await readJsonBody(req);
-      const r = await handleBatchStatusTransition(input, db);
-      return send(res, r.status, r.data);
-    }
-
-    if (req.method === "POST" && url.pathname === "/import/preview") {
-      const r = await handleImportPreview(req);
-      return send(res, r.status, r.data);
-    }
-
-    if (req.method === "POST" && url.pathname === "/import/commit") {
-      const input = await readJsonBody(req);
-      const r = await handleImportCommit(input, db);
-      return send(res, r.status, r.data);
-    }
-
-    const obsMatch = url.pathname.match(/^\/tiles\/([^/]+)\/observations$/);
-    if (obsMatch && req.method === "POST") {
-      const input = await readJsonBody(req);
-      const r = await handleAddObservation(obsMatch[1], input, db);
-      return send(res, r.status, r.data);
-    }
-
-    const tileStatusHistoryMatch = url.pathname.match(/^\/tiles\/([^/]+)\/status-history$/);
-    if (tileStatusHistoryMatch && req.method === "GET") {
-      const r = await handleGetStatusHistory(tileStatusHistoryMatch[1], db);
-      return send(res, r.status, r.data);
-    }
-
-    const tileStatusMatch = url.pathname.match(/^\/tiles\/([^/]+)\/status$/);
-    if (tileStatusMatch && req.method === "GET") {
-      const r = await handleGetTileStatus(tileStatusMatch[1], db);
-      return send(res, r.status, r.data);
-    }
-    if (tileStatusMatch && req.method === "PATCH") {
-      const input = await readJsonBody(req);
-      const r = await handleTransitionStatus(tileStatusMatch[1], input, db);
-      return send(res, r.status, r.data);
-    }
-
-    const tileMatch = url.pathname.match(/^\/tiles\/([^/]+)$/);
-    if (tileMatch && req.method === "GET") {
-      const r = await handleGetTile(tileMatch[1], db);
-      return send(res, r.status, r.data);
-    }
-    if (tileMatch && req.method === "PATCH") {
-      const input = await readJsonBody(req);
-      const r = await handleUpdateTile(tileMatch[1], input, db);
-      return send(res, r.status, r.data);
-    }
-
-    if (req.method === "GET" && url.pathname === "/reports/recipes") {
-      const r = await handleRecipesReport(db);
-      return send(res, r.status, r.data);
-    }
-
-    if (req.method === "POST" && url.pathname === "/firing-plans/calculate") {
-      const input = await readJsonBody(req);
-      const r = await handleCalcFiringPlan(input, db);
-      return send(res, r.status, r.data);
-    }
-
-    if (req.method === "GET" && url.pathname === "/firing-plans") {
-      const r = await handleListPlans(url, db);
-      return send(res, r.status, r.data);
-    }
-
-    if (req.method === "POST" && url.pathname === "/firing-plans") {
-      const input = await readJsonBody(req);
-      const r = await handleCreatePlan(input, db);
-      return send(res, r.status, r.data);
-    }
-
-    const planApplyMatch = url.pathname.match(/^\/firing-plans\/([^/]+)\/apply$/);
-    if (planApplyMatch && req.method === "POST") {
-      const input = await readJsonBody(req);
-      const r = await handleApplyPlan(planApplyMatch[1], input, db);
-      return send(res, r.status, r.data);
-    }
-
-    const planMatch = url.pathname.match(/^\/firing-plans\/([^/]+)$/);
-    if (planMatch && req.method === "GET") {
-      const r = await handleGetPlan(planMatch[1], db);
-      return send(res, r.status, r.data);
-    }
-    if (planMatch && req.method === "PATCH") {
-      const input = await readJsonBody(req);
-      const r = await handleUpdatePlan(planMatch[1], input, db);
-      return send(res, r.status, r.data);
-    }
-    if (planMatch && req.method === "DELETE") {
-      const r = await handleDeletePlan(planMatch[1], db);
-      return send(res, r.status, r.data);
-    }
-
-    if (req.method === "GET" && url.pathname === "/recipes") {
-      const r = await handleListRecipes(url, db);
-      return send(res, r.status, r.data);
-    }
-
-    if (req.method === "POST" && url.pathname === "/recipes") {
-      const input = await readJsonBody(req);
-      const r = await handleCreateRecipe(input, db);
-      return send(res, r.status, r.data);
-    }
-
-    const recipeVersionsDiffMatch = url.pathname.match(/^\/recipes\/([^/]+)\/versions\/diff$/);
-    if (recipeVersionsDiffMatch && req.method === "GET") {
-      const versionIdA = url.searchParams.get("baseline");
-      const versionIdB = url.searchParams.get("target");
-      if (!versionIdA || !versionIdB) {
-        return send(res, 400, {
-          error: "missing_required",
-          message: "缺少 baseline 或 target 参数",
-          required: ["baseline", "target"]
-        });
+      let match = null;
+      if (route.path) {
+        if (url.pathname !== route.path) continue;
+      } else if (route.pattern) {
+        match = url.pathname.match(route.pattern);
+        if (!match) continue;
+      } else {
+        continue;
       }
-      const r = await handleGetRecipeVersionDiff(recipeVersionsDiffMatch[1], versionIdA, versionIdB, db);
-      return send(res, r.status, r.data);
-    }
 
-    const recipeVersionsReportMatch = url.pathname.match(/^\/recipes\/([^/]+)\/versions\/([^/]+)\/report$/);
-    if (recipeVersionsReportMatch && req.method === "GET") {
-      const r = await handleGetVersionReport(recipeVersionsReportMatch[1], recipeVersionsReportMatch[2], db);
-      return send(res, r.status, r.data);
-    }
+      let input = {};
+      if (route.needBody) {
+        input = await readJsonBody(req);
+      }
 
-    const recipeVersionsCopyMatch = url.pathname.match(/^\/recipes\/([^/]+)\/versions\/([^/]+)\/copy$/);
-    if (recipeVersionsCopyMatch && req.method === "POST") {
-      const input = await readJsonBody(req);
-      const r = await handleCopyVersion(recipeVersionsCopyMatch[1], recipeVersionsCopyMatch[2], input, db);
-      return send(res, r.status, r.data);
-    }
-
-    const recipeVersionsMatch = url.pathname.match(/^\/recipes\/([^/]+)\/versions\/([^/]+)$/);
-    if (recipeVersionsMatch && req.method === "GET") {
-      const r = await handleGetVersion(recipeVersionsMatch[1], recipeVersionsMatch[2], db);
-      return send(res, r.status, r.data);
-    }
-
-    const recipeReportMatch = url.pathname.match(/^\/recipes\/([^/]+)\/report$/);
-    if (recipeReportMatch && req.method === "GET") {
-      const r = await handleGetRecipeReport(recipeReportMatch[1], db);
-      return send(res, r.status, r.data);
-    }
-
-    const recipeVersionsListMatch = url.pathname.match(/^\/recipes\/([^/]+)\/versions$/);
-    if (recipeVersionsListMatch && req.method === "GET") {
-      const r = await handleListVersions(recipeVersionsListMatch[1], db);
-      return send(res, r.status, r.data);
-    }
-    if (recipeVersionsListMatch && req.method === "POST") {
-      const input = await readJsonBody(req);
-      const r = await handleCreateVersion(recipeVersionsListMatch[1], input, db);
-      return send(res, r.status, r.data);
-    }
-
-    const recipeMatch = url.pathname.match(/^\/recipes\/([^/]+)$/);
-    if (recipeMatch && req.method === "GET") {
-      const r = await handleGetRecipe(recipeMatch[1], db);
-      return send(res, r.status, r.data);
-    }
-    if (recipeMatch && req.method === "PATCH") {
-      const input = await readJsonBody(req);
-      const r = await handleUpdateRecipe(recipeMatch[1], input, db);
-      return send(res, r.status, r.data);
-    }
-    if (recipeMatch && req.method === "DELETE") {
-      const r = await handleDeleteRecipe(recipeMatch[1], db);
-      return send(res, r.status, r.data);
-    }
-
-    const batchSummaryMatch = url.pathname.match(/^\/batches\/([^/]+)\/summary$/);
-    if (batchSummaryMatch && req.method === "GET") {
-      const r = await handleGetBatchSummary(batchSummaryMatch[1], db);
-      return send(res, r.status, r.data);
-    }
-
-    const batchObsMatch = url.pathname.match(/^\/batches\/([^/]+)\/observations$/);
-    if (batchObsMatch && req.method === "POST") {
-      const input = await readJsonBody(req);
-      const r = await handleAddBatchObservation(batchObsMatch[1], input, db);
-      return send(res, r.status, r.data);
-    }
-
-    const batchStatusMatch = url.pathname.match(/^\/batches\/([^/]+)\/status$/);
-    if (batchStatusMatch && req.method === "PATCH") {
-      const input = await readJsonBody(req);
-      const r = await handleAdvanceBatchStatus(batchStatusMatch[1], input, db);
-      return send(res, r.status, r.data);
-    }
-
-    const batchTilesMatch = url.pathname.match(/^\/batches\/([^/]+)\/tiles$/);
-    if (batchTilesMatch && req.method === "POST") {
-      const input = await readJsonBody(req);
-      const r = await handleAddBatchTiles(batchTilesMatch[1], input, db);
-      return send(res, r.status, r.data);
-    }
-    if (batchTilesMatch && req.method === "DELETE") {
-      const input = await readJsonBody(req);
-      const r = await handleRemoveBatchTiles(batchTilesMatch[1], input, db);
-      return send(res, r.status, r.data);
-    }
-
-    if (req.method === "GET" && url.pathname === "/batches") {
-      const r = await handleListBatches(url, db);
-      return send(res, r.status, r.data);
-    }
-
-    if (req.method === "POST" && url.pathname === "/batches") {
-      const input = await readJsonBody(req);
-      const r = await handleCreateBatch(input, db);
-      return send(res, r.status, r.data);
-    }
-
-    const batchMatch = url.pathname.match(/^\/batches\/([^/]+)$/);
-    if (batchMatch && req.method === "GET") {
-      const r = await handleGetBatch(batchMatch[1], db);
-      return send(res, r.status, r.data);
-    }
-
-    if (req.method === "GET" && url.pathname === "/inventory") {
-      const r = await handleListInventory(url, db);
-      return send(res, r.status, r.data);
-    }
-
-    if (req.method === "POST" && url.pathname === "/inventory") {
-      const input = await readJsonBody(req);
-      const r = await handleCreateInventory(input, db);
-      return send(res, r.status, r.data);
-    }
-
-    if (req.method === "GET" && url.pathname === "/inventory/summary") {
-      const r = await handleInventorySummary(db);
-      return send(res, r.status, r.data);
-    }
-
-    const inventoryBatchNoTilesMatch = url.pathname.match(/^\/inventory\/batch-no\/([^/]+)\/tiles$/);
-    if (inventoryBatchNoTilesMatch && req.method === "GET") {
-      const r = await handleBatchNoTiles(decodeURIComponent(inventoryBatchNoTilesMatch[1]), db);
-      return send(res, r.status, r.data);
-    }
-
-    const inventoryBatchSummaryMatch = url.pathname.match(/^\/inventory\/batch-no\/([^/]+)\/summary$/);
-    if (inventoryBatchSummaryMatch && req.method === "GET") {
-      const r = await handleBatchUsageSummary(decodeURIComponent(inventoryBatchSummaryMatch[1]), db);
-      return send(res, r.status, r.data);
-    }
-
-    const inventoryTransactionsTileMatch = url.pathname.match(/^\/inventory\/transactions\/tile\/([^/]+)$/);
-    if (inventoryTransactionsTileMatch && req.method === "GET") {
-      const r = await handleGetTileTransactions(inventoryTransactionsTileMatch[1], db);
-      return send(res, r.status, r.data);
-    }
-
-    const inventoryTransactionsStockMatch = url.pathname.match(/^\/inventory\/transactions\/stock\/([^/]+)$/);
-    if (inventoryTransactionsStockMatch && req.method === "GET") {
-      const r = await handleGetStockTransactions(inventoryTransactionsStockMatch[1], db);
-      return send(res, r.status, r.data);
-    }
-
-    const inventoryMatch = url.pathname.match(/^\/inventory\/([^/]+)$/);
-    if (inventoryMatch && req.method === "GET") {
-      const r = await handleGetInventory(inventoryMatch[1], db);
-      return send(res, r.status, r.data);
-    }
-    if (inventoryMatch && req.method === "PATCH") {
-      const input = await readJsonBody(req);
-      const r = await handleUpdateInventory(inventoryMatch[1], input, db);
-      return send(res, r.status, r.data);
-    }
-    if (inventoryMatch && req.method === "DELETE") {
-      const r = await handleDeleteInventory(inventoryMatch[1], db);
-      return send(res, r.status, r.data);
-    }
-
-    if (req.method === "GET" && url.pathname === "/defects/catalog") {
-      const r = handleGetDefectCatalog();
-      return send(res, r.status, r.data);
-    }
-
-    if (req.method === "GET" && url.pathname === "/defects/stats/overall") {
-      const r = await handleGetOverallDefectStats(db);
-      return send(res, r.status, r.data);
-    }
-
-    if (req.method === "GET" && url.pathname === "/defects/stats/by-kiln") {
-      const r = await handleGetDefectStatsByKiln(url, db);
-      return send(res, r.status, r.data);
-    }
-
-    if (req.method === "GET" && url.pathname === "/defects/stats/by-ash-source") {
-      const r = await handleGetDefectStatsByAshSource(url, db);
-      return send(res, r.status, r.data);
-    }
-
-    if (req.method === "GET" && url.pathname === "/defects/high-frequency") {
-      const r = await handleGetHighFrequencyDefects(url, db);
-      return send(res, r.status, r.data);
-    }
-
-    if (req.method === "GET" && url.pathname === "/defects/query/tiles") {
-      const r = await handleQueryTilesByDefect(url, db);
-      return send(res, r.status, r.data);
-    }
-
-    if (req.method === "POST" && url.pathname === "/defects/migrate") {
-      const r = await handleRunDefectMigration(db);
-      return send(res, r.status, r.data);
-    }
-
-    const tileDefectTagsMatch = url.pathname.match(/^\/tiles\/([^/]+)\/defect-tags$/);
-    if (tileDefectTagsMatch && req.method === "GET") {
-      const r = await handleGetTileDefectTags(tileDefectTagsMatch[1], db);
-      return send(res, r.status, r.data);
-    }
-    if (tileDefectTagsMatch && req.method === "PATCH") {
-      const input = await readJsonBody(req);
-      const r = await handleUpdateTileDefectTags(tileDefectTagsMatch[1], input, db);
-      return send(res, r.status, r.data);
-    }
-    if (tileDefectTagsMatch && req.method === "POST") {
-      const input = await readJsonBody(req);
-      const r = await handleAddDefectTag(tileDefectTagsMatch[1], input, db);
-      return send(res, r.status, r.data);
-    }
-    if (tileDefectTagsMatch && req.method === "DELETE") {
-      const input = await readJsonBody(req);
-      const r = await handleRemoveDefectTag(tileDefectTagsMatch[1], input, db);
-      return send(res, r.status, r.data);
-    }
-
-    const tileReviewMatch = url.pathname.match(/^\/tiles\/([^/]+)\/review$/);
-    if (tileReviewMatch && req.method === "GET") {
-      const r = await handleGetExperimentReview(tileReviewMatch[1], url, db);
-      return send(res, r.status, r.data);
-    }
-
-    if (req.method === "GET" && url.pathname === "/dashboard/overview") {
-      const r = await handleGetDashboardOverview(url, db);
-      return send(res, r.status, r.data);
-    }
-
-    if (req.method === "GET" && url.pathname === "/dashboard/summary") {
-      const r = await handleGetDashboardSummary(url, db);
-      return send(res, r.status, r.data);
-    }
-
-    if (req.method === "GET" && url.pathname === "/dashboard/recent-observations") {
-      const r = await handleGetRecentObservations(url, db);
-      return send(res, r.status, r.data);
-    }
-
-    if (req.method === "GET" && url.pathname === "/dashboard/ash-source-scores") {
-      const r = await handleGetAshSourceScores(url, db);
-      return send(res, r.status, r.data);
-    }
-
-    if (req.method === "GET" && url.pathname === "/dashboard/defects-by-peak-temp") {
-      const r = await handleGetDefectsByPeakTemp(url, db);
-      return send(res, r.status, r.data);
-    }
-
-    if (req.method === "GET" && url.pathname === "/dashboard/low-score-tiles") {
-      const r = await handleGetLowScoreTiles(url, db);
-      return send(res, r.status, r.data);
-    }
-
-    if (req.method === "GET" && url.pathname === "/dashboard/compare") {
-      const r = await handleGetDashboardCompare(url, db);
-      return send(res, r.status, r.data);
-    }
-
-    if (req.method === "GET" && url.pathname === "/events/types") {
-      const r = await handleGetEventTypes();
-      return send(res, r.status, r.data);
-    }
-
-    if (req.method === "GET" && url.pathname === "/events/stats") {
-      const r = await handleGetEventStats(db);
-      return send(res, r.status, r.data);
-    }
-
-    const eventsByTypeMatch = url.pathname.match(/^\/events\/type\/([^/]+)$/);
-    if (eventsByTypeMatch && req.method === "GET") {
-      const r = await handleGetEventsByType(eventsByTypeMatch[1], url, db);
-      return send(res, r.status, r.data);
-    }
-
-    const eventTimelineMatch = url.pathname.match(/^\/events\/timeline\/([^/]+)$/);
-    if (eventTimelineMatch && req.method === "GET") {
-      const r = await handleGetEntityTimeline(decodeURIComponent(eventTimelineMatch[1]), url, db);
+      const r = await route.handler(url, db, input, req, match);
       return send(res, r.status, r.data);
     }
 
