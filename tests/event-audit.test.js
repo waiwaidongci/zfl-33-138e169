@@ -595,6 +595,194 @@ async function test10_batch_events() {
   assertEq(statusEvent.payload.to, "loading", "to 状态正确");
 }
 
+async function test10a_batch_tiles_add_event_persistence() {
+  console.log("\nTest 10a: 批次添加试片事件落盘与重载验证");
+
+  await writeV3Db();
+  const { migrateToLatest } = await import("../lib/schema-migration.js");
+  const { loadDb, saveDb, getCollections } = await import("../lib/db.js");
+
+  await migrateToLatest({ autoBackup: false });
+  let db = await loadDb();
+
+  const { handleCreateTile } = await import("../lib/routes.js");
+  const { handleCreateBatch, handleAddBatchTiles } = await import("../lib/batch-routes.js");
+  const { ensureEventCollection, getTimeline, EVENT_TYPES } = await import("../lib/event-log.js");
+
+  const tileResult1 = await handleCreateTile({
+    id: "AG-ADD-TEST-001",
+    body: "批次添加测试1",
+    recipe: "松灰42 长石35",
+    ashSource: "测试灰源",
+    kiln: "K-2",
+    peakTemp: 1240
+  }, db);
+  assertEq(tileResult1.status, 201, "创建试片1成功");
+  const tileId1 = tileResult1.data.id;
+  assertEq(tileId1, "AG-ADD-TEST-001", "试片1 ID正确");
+
+  const tileResult2 = await handleCreateTile({
+    id: "AG-ADD-TEST-002",
+    body: "批次添加测试2",
+    recipe: "松灰42 长石35",
+    ashSource: "测试灰源",
+    kiln: "K-2",
+    peakTemp: 1240
+  }, db);
+  assertEq(tileResult2.status, 201, "创建试片2成功");
+  const tileId2 = tileResult2.data.id;
+  assertEq(tileId2, "AG-ADD-TEST-002", "试片2 ID正确");
+  assert(tileId1 !== tileId2, "两个试片ID不同");
+
+  const coll = getCollections(db);
+  coll.tiles.find(t => t.id === tileId1).status = "fired";
+  coll.tiles.find(t => t.id === tileId1).statusHistory = [{ at: "2026-01-01", from: "draft", to: "fired", note: "测试" }];
+  coll.tiles.find(t => t.id === tileId2).status = "fired";
+  coll.tiles.find(t => t.id === tileId2).statusHistory = [{ at: "2026-01-01", from: "draft", to: "fired", note: "测试" }];
+  assertEq(coll.tiles.find(t => t.id === tileId1).status, "fired", "试片1状态已设为 fired");
+  assertEq(coll.tiles.find(t => t.id === tileId2).status, "fired", "试片2状态已设为 fired");
+  assertEq(coll.tiles.find(t => t.id === tileId1).batchId, null, "试片1 batchId 为 null");
+  assertEq(coll.tiles.find(t => t.id === tileId2).batchId, null, "试片2 batchId 为 null");
+
+  await saveDb(db);
+
+  const batchResult = await handleCreateBatch({
+    id: "BATCH-ADD-TEST-001",
+    name: "落盘验证批次",
+    kiln: "K-2"
+  }, db);
+  assertEq(batchResult.status, 201, "创建批次成功");
+  const batchId = batchResult.data.id;
+  assertEq(batchId, "BATCH-ADD-TEST-001", "批次ID正确");
+  assertEq(getCollections(db).batches.find(b => b.id === batchId).tileIds.length, 0, "新建批次 tileIds 为空");
+
+  const eventCountBeforeAdd = getCollections(db).businessEvents.length;
+
+  const addResult = await handleAddBatchTiles(batchId, {
+    tileIds: [tileId1, tileId2]
+  }, db);
+  assertEq(addResult.status, 200, "添加试片到批次成功");
+  assertEq(addResult.data.forbidden.length, 0, `没有被禁止的试片: ${JSON.stringify(addResult.data.forbidden)}`);
+  assertEq(addResult.data.duplicated.length, 0, `没有重复的试片: ${JSON.stringify(addResult.data.duplicated)}`);
+  assertEq(addResult.data.added.length, 2, "成功添加 2 个试片");
+
+  const eventCountAfterAdd = getCollections(db).businessEvents.length;
+  assertEq(eventCountAfterAdd, eventCountBeforeAdd + 1, "添加后事件数增加 1（内存中）");
+
+  const addEvent = getCollections(db).businessEvents[eventCountAfterAdd - 1];
+  assertEq(addEvent.type, EVENT_TYPES.BATCH_TILES_ADDED, "事件类型为 batch_tiles_added");
+  assertEq(addEvent.entityId, batchId, "事件实体为批次");
+  assertEq(addEvent.payload.tileIds.length, 2, "payload 包含 2 个试片ID");
+
+  db = await loadDb();
+  ensureEventCollection(db);
+  const eventsAfterReload = getCollections(db).businessEvents;
+  const reloadedAddEvent = eventsAfterReload.find(e => e.type === EVENT_TYPES.BATCH_TILES_ADDED && e.entityId === batchId);
+  assert(reloadedAddEvent !== undefined, "重载后 batch_tiles_added 事件仍存在");
+  assertEq(reloadedAddEvent.payload.tileIds.length, 2, "重载后 payload 完整");
+
+  const batchTimeline = getTimeline(db, batchId);
+  assert(batchTimeline.events.some(e => e.type === EVENT_TYPES.BATCH_TILES_ADDED), "批次时间线包含添加试片事件");
+}
+
+async function test10b_batch_tiles_remove_event_persistence() {
+  console.log("\nTest 10b: 批次移除试片事件落盘与重载验证");
+
+  await writeV3Db();
+  const { migrateToLatest } = await import("../lib/schema-migration.js");
+  const { loadDb, saveDb, getCollections } = await import("../lib/db.js");
+
+  await migrateToLatest({ autoBackup: false });
+  let db = await loadDb();
+
+  const { handleCreateTile } = await import("../lib/routes.js");
+  const { handleCreateBatch, handleAddBatchTiles, handleRemoveBatchTiles } = await import("../lib/batch-routes.js");
+  const { ensureEventCollection, getTimeline, EVENT_TYPES } = await import("../lib/event-log.js");
+
+  const tileResult1 = await handleCreateTile({
+    id: "AG-REMOVE-TEST-001",
+    body: "批次移除测试1",
+    recipe: "松灰42 长石35",
+    ashSource: "测试灰源",
+    kiln: "K-2",
+    peakTemp: 1240
+  }, db);
+  const tileId1 = tileResult1.data.id;
+  assertEq(tileId1, "AG-REMOVE-TEST-001", "test10b: 试片1 ID正确");
+
+  const tileResult2 = await handleCreateTile({
+    id: "AG-REMOVE-TEST-002",
+    body: "批次移除测试2",
+    recipe: "松灰42 长石35",
+    ashSource: "测试灰源",
+    kiln: "K-2",
+    peakTemp: 1240
+  }, db);
+  const tileId2 = tileResult2.data.id;
+  assertEq(tileId2, "AG-REMOVE-TEST-002", "test10b: 试片2 ID正确");
+
+  const coll = getCollections(db);
+  coll.tiles.find(t => t.id === tileId1).status = "fired";
+  coll.tiles.find(t => t.id === tileId1).statusHistory = [{ at: "2026-01-01", from: "draft", to: "fired", note: "测试" }];
+  coll.tiles.find(t => t.id === tileId2).status = "fired";
+  coll.tiles.find(t => t.id === tileId2).statusHistory = [{ at: "2026-01-01", from: "draft", to: "fired", note: "测试" }];
+  assertEq(coll.tiles.find(t => t.id === tileId1).status, "fired", "test10b: 试片1状态已设为 fired");
+  assertEq(coll.tiles.find(t => t.id === tileId2).status, "fired", "test10b: 试片2状态已设为 fired");
+
+  await saveDb(db);
+
+  const batchResult = await handleCreateBatch({
+    id: "BATCH-REMOVE-TEST-001",
+    name: "移除验证批次",
+    kiln: "K-2"
+  }, db);
+  assertEq(batchResult.status, 201, "test10b: 创建批次成功");
+  const batchId = batchResult.data.id;
+  assertEq(batchId, "BATCH-REMOVE-TEST-001", "test10b: 批次ID正确");
+  assertEq(getCollections(db).batches.find(b => b.id === batchId).tileIds.length, 0, "test10b: 新建批次 tileIds 为空");
+
+  const addResult = await handleAddBatchTiles(batchId, {
+    tileIds: [tileId1, tileId2]
+  }, db);
+  assertEq(addResult.status, 200, "test10b: 添加试片到批次成功");
+  assertEq(addResult.data.forbidden.length, 0, `test10b: 没有被禁止的试片: ${JSON.stringify(addResult.data.forbidden)}`);
+  assertEq(addResult.data.duplicated.length, 0, `test10b: 没有重复的试片: ${JSON.stringify(addResult.data.duplicated)}`);
+  assertEq(addResult.data.added.length, 2, "test10b: 成功添加 2 个试片");
+  await saveDb(db);
+
+  const eventCountBeforeRemove = getCollections(db).businessEvents.length;
+
+  const removeResult = await handleRemoveBatchTiles(batchId, {
+    tileIds: [tileId1]
+  }, db);
+  assertEq(removeResult.status, 200, "移除试片成功");
+  assertEq(removeResult.data.forbidden.length, 0, `test10b: 移除时没有被禁止的试片: ${JSON.stringify(removeResult.data.forbidden)}`);
+  assertEq(removeResult.data.notInBatch.length, 0, `test10b: 移除时没有不在批次中的试片: ${JSON.stringify(removeResult.data.notInBatch)}`);
+  assertEq(removeResult.data.removed.length, 1, "成功移除 1 个试片");
+
+  const eventCountAfterRemove = getCollections(db).businessEvents.length;
+  assertEq(eventCountAfterRemove, eventCountBeforeRemove + 1, "移除后事件数增加 1（内存中）");
+
+  const removeEvent = getCollections(db).businessEvents[eventCountAfterRemove - 1];
+  assertEq(removeEvent.type, EVENT_TYPES.BATCH_TILES_REMOVED, "事件类型为 batch_tiles_removed");
+  assertEq(removeEvent.entityId, batchId, "事件实体为批次");
+  assertEq(removeEvent.payload.tileIds.length, 1, "payload 包含 1 个试片ID");
+  assertEq(removeEvent.payload.tileIds[0], tileId1, "payload 包含正确的试片ID");
+
+  db = await loadDb();
+  ensureEventCollection(db);
+  const eventsAfterReload = getCollections(db).businessEvents;
+  const reloadedRemoveEvent = eventsAfterReload.find(e => e.type === EVENT_TYPES.BATCH_TILES_REMOVED && e.entityId === batchId);
+  assert(reloadedRemoveEvent !== undefined, "重载后 batch_tiles_removed 事件仍存在");
+  assertEq(reloadedRemoveEvent.payload.tileIds[0], tileId1, "重载后 payload 完整");
+
+  const batchTimeline = getTimeline(db, batchId);
+  const eventTypesInTimeline = batchTimeline.events.map(e => e.type);
+  assert(eventTypesInTimeline.includes(EVENT_TYPES.BATCH_TILES_ADDED), "批次时间线包含添加试片事件");
+  assert(eventTypesInTimeline.includes(EVENT_TYPES.BATCH_TILES_REMOVED), "批次时间线包含移除试片事件");
+  assert(eventTypesInTimeline.includes(EVENT_TYPES.BATCH_CREATED), "批次时间线包含创建事件");
+}
+
 async function test11_full_workflow_with_events() {
   console.log("\nTest 11: 旧数据迁移后完整业务流程验证");
 
@@ -773,6 +961,8 @@ async function run() {
     await test8_defect_tag_events();
     await test9_recipe_version_event();
     await test10_batch_events();
+    await test10a_batch_tiles_add_event_persistence();
+    await test10b_batch_tiles_remove_event_persistence();
     await test11_full_workflow_with_events();
     await test12_api_compatibility();
     await test13_event_ordering_and_dedup();
