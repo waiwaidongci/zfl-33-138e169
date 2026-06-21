@@ -12,7 +12,7 @@ npm start
 
 ## 测试与本地验证
 
-项目内置了轻量级测试运行器，不依赖第三方框架，直接使用原生 Node.js 执行。所有测试均在独立的临时数据目录（`tests/tmp/<模块名>/`）中运行，完成后自动清理。
+项目内置了轻量级测试运行器，不依赖第三方框架，直接使用原生 Node.js 执行。测试数据会写入 `tests/tmp` 或 `tests/tmp-*` 临时目录，完成后自动清理。
 
 ### 快速开始
 
@@ -67,7 +67,7 @@ node tests/runner.js --help
 
 | 变量 | 说明 |
 |------|------|
-| `ASH_GLAZE_DATA_DIR` | 数据目录，测试时指向 `tests/tmp/<模块>/data` |
+| `ASH_GLAZE_DATA_DIR` | 数据目录，测试时指向 `tests/tmp` 或 `tests/tmp-*` 下的隔离数据目录 |
 | `ASH_GLAZE_DB_PATH` | 数据文件路径，测试时指向上述目录下的 `ash-glaze.json` |
 | `ASH_GLAZE_BACKUP_DIR` | 备份目录，测试时指向上述目录下的 `backups/` |
 | `ASH_GLAZE_MIGRATIONS_DIR` | 自定义迁移脚本目录，仅迁移失败注入测试时使用 |

@@ -1,12 +1,13 @@
 import { spawn } from "node:child_process";
 import { join, dirname, basename } from "node:path";
 import { fileURLToPath } from "node:url";
-import { rm } from "node:fs/promises";
+import { readdir, rm } from "node:fs/promises";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = dirname(__dirname);
 const testsDir = __dirname;
 const testsTmpRoot = join(projectRoot, "tests", "tmp");
+const testsTmpPrefix = "tmp";
 
 const MODULE_GROUPS = {
   migration: {
@@ -49,6 +50,21 @@ const MODULE_GROUPS = {
 
 const ALL_MODULES = Object.keys(MODULE_GROUPS);
 
+const MODULE_ALIASES = {
+  "inventory-reservation": {
+    label: "原料库存与预留",
+    files: ["inventory-reservation.test.js"],
+  },
+  "inventory-regression": {
+    label: "原料库存回归",
+    files: ["inventory-reservation-regression.test.js"],
+  },
+};
+
+function getModuleGroup(mod) {
+  return MODULE_GROUPS[mod] || MODULE_ALIASES[mod];
+}
+
 function parseArgs(argv) {
   const args = argv.slice(2);
   const opts = {
@@ -71,7 +87,7 @@ function parseArgs(argv) {
       case "-m":
         if (i + 1 < args.length) {
           const mod = args[++i];
-          if (MODULE_GROUPS[mod]) {
+          if (getModuleGroup(mod)) {
             opts.modules.push(mod);
           } else {
             console.error(`未知模块: ${mod}。可用模块: ${ALL_MODULES.join(", ")}`);
@@ -103,7 +119,7 @@ function parseArgs(argv) {
         break;
       default:
         if (!arg.startsWith("-")) {
-          if (MODULE_GROUPS[arg]) {
+          if (getModuleGroup(arg)) {
             opts.modules.push(arg);
           } else {
             console.error(`未知参数: ${arg}`);
@@ -207,7 +223,7 @@ function expandModules(modules) {
   const files = [];
   const seen = new Set();
   for (const mod of modules) {
-    const group = MODULE_GROUPS[mod];
+    const group = getModuleGroup(mod);
     if (!group) continue;
     for (const f of group.files) {
       if (!seen.has(f)) {
@@ -225,9 +241,17 @@ function expandModules(modules) {
 }
 
 async function cleanTmpDirs() {
-  console.log(`\n🧹 清理临时测试数据目录: ${testsTmpRoot}`);
+  console.log(`\n🧹 清理临时测试数据目录: ${join(testsDir, "tmp*")}`);
   try {
-    await rm(testsTmpRoot, { recursive: true, force: true });
+    const entries = await readdir(testsDir, { withFileTypes: true });
+    const tmpDirs = entries
+      .filter(entry => entry.isDirectory() && entry.name.startsWith(testsTmpPrefix))
+      .map(entry => join(testsDir, entry.name));
+
+    for (const dir of tmpDirs) {
+      await rm(dir, { recursive: true, force: true });
+    }
+
     console.log("✅ 清理完成\n");
   } catch (err) {
     console.warn(`⚠️  清理时出错（忽略）: ${err.message}\n`);

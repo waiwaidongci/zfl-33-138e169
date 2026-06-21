@@ -1,4 +1,4 @@
-import { mkdir, writeFile, readFile, rm } from "node:fs/promises";
+import { mkdir, writeFile, readFile, rm, readdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join, dirname, basename } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -141,7 +141,14 @@ export async function readDb(ctx) {
 }
 
 export async function cleanAllTmpDirs() {
-  await rm(testsTmpRoot, { recursive: true, force: true });
+  const entries = await readdir(__dirname, { withFileTypes: true });
+  const tmpDirs = entries
+    .filter(entry => entry.isDirectory() && entry.name.startsWith("tmp"))
+    .map(entry => join(__dirname, entry.name));
+
+  for (const dir of tmpDirs) {
+    await rm(dir, { recursive: true, force: true });
+  }
 }
 
 export function isCI() {
