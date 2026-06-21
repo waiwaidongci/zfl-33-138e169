@@ -87,6 +87,12 @@ import {
   handleGetStatusHistory,
   handleBatchStatusTransition
 } from "./lib/tile-status-routes.js";
+import {
+  handleGetEntityTimeline,
+  handleGetEventsByType,
+  handleGetEventStats,
+  handleGetEventTypes
+} from "./lib/event-routes.js";
 
 const port = Number(process.env.PORT || 3033);
 
@@ -490,6 +496,28 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === "GET" && url.pathname === "/dashboard/compare") {
       const r = await handleGetDashboardCompare(url, db);
+      return send(res, r.status, r.data);
+    }
+
+    if (req.method === "GET" && url.pathname === "/events/types") {
+      const r = await handleGetEventTypes();
+      return send(res, r.status, r.data);
+    }
+
+    if (req.method === "GET" && url.pathname === "/events/stats") {
+      const r = await handleGetEventStats(db);
+      return send(res, r.status, r.data);
+    }
+
+    const eventsByTypeMatch = url.pathname.match(/^\/events\/type\/([^/]+)$/);
+    if (eventsByTypeMatch && req.method === "GET") {
+      const r = await handleGetEventsByType(eventsByTypeMatch[1], url, db);
+      return send(res, r.status, r.data);
+    }
+
+    const eventTimelineMatch = url.pathname.match(/^\/events\/timeline\/([^/]+)$/);
+    if (eventTimelineMatch && req.method === "GET") {
+      const r = await handleGetEntityTimeline(decodeURIComponent(eventTimelineMatch[1]), url, db);
       return send(res, r.status, r.data);
     }
 

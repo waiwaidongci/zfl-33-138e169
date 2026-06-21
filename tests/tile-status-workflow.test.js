@@ -236,10 +236,10 @@ async function test3_data_migration() {
 
   const result = await migrateToLatest({ autoBackup: false });
   assert(result.success, "迁移执行成功");
-  assertEq(result.toVersion, 3, "迁移后 schemaVersion 为 3");
+  assertEq(result.toVersion, 4, "迁移后 schemaVersion 为 4");
 
   const db = await loadDb();
-  assertEq(getSchemaVersion(db), 3, "数据库 schemaVersion 为 3");
+  assertEq(getSchemaVersion(db), 4, "数据库 schemaVersion 为 4");
 
   const coll = getCollections(db);
   assertEq(coll.tiles.length, 2, "迁移后 tiles 数量正确");

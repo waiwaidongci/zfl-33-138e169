@@ -83,7 +83,7 @@ async function test1_formatDetection() {
 
   const converted = toNewFormat(rawLegacy);
   assert(typeof converted.schemaVersion === "number", "转换后有 schemaVersion 字段");
-  assertEq(converted.schemaVersion, 3, "转换后 schemaVersion 为 3");
+  assertEq(converted.schemaVersion, 4, "转换后 schemaVersion 为 4");
   assert(Array.isArray(converted.migrations), "有 migrations 数组");
   assert(typeof converted.collections === "object", "有 collections 对象");
 
@@ -154,16 +154,17 @@ async function test3_migrationUp() {
   const upResult = await migrateToLatest({ autoBackup: true });
   assert(upResult.success, "migrateToLatest 执行成功");
   assertEq(upResult.fromVersion, 0, "迁移起始版本为 0");
-  assertEq(upResult.toVersion, 3, "迁移目标版本为 3");
+  assertEq(upResult.toVersion, 4, "迁移目标版本为 4");
   assert(upResult.backupPath !== null, "迁移前创建了备份");
   assert(existsSync(upResult.backupPath), "备份文件存在");
 
   const dbAfter = await loadDb();
-  assertEq(getSchemaVersion(dbAfter), 3, "迁移后 schemaVersion=3");
-  assertEq(getMigrations(dbAfter).length, 3, "迁移记录有 3 条");
+  assertEq(getSchemaVersion(dbAfter), 4, "迁移后 schemaVersion=4");
+  assertEq(getMigrations(dbAfter).length, 4, "迁移记录有 4 条");
   assertEq(getMigrations(dbAfter)[0].version, 1, "第一条迁移记录版本正确");
   assertEq(getMigrations(dbAfter)[1].version, 2, "第二条迁移记录版本正确");
   assertEq(getMigrations(dbAfter)[2].version, 3, "第三条迁移记录版本正确");
+  assertEq(getMigrations(dbAfter)[3].version, 4, "第四条迁移记录版本正确");
 
   const coll = getCollections(dbAfter);
   assertEq(coll.tiles.length, 2, "迁移后 tiles 数据完整");
@@ -180,24 +181,24 @@ async function test4_migrationRollback() {
 
   const rbResult = await rollbackLastMigration({ autoBackup: true });
   assert(rbResult.success, "rollbackLastMigration 执行成功");
-  assertEq(rbResult.rolledBack.version, 3, "回滚的版本为 3");
-  assertEq(rbResult.previousVersion, 2, "回滚后版本为 2");
+  assertEq(rbResult.rolledBack.version, 4, "回滚的版本为 4");
+  assertEq(rbResult.previousVersion, 3, "回滚后版本为 3");
 
   const dbRolled = JSON.parse(await readFile(testDbPath, "utf8"));
-  assert("schemaVersion" in dbRolled, "回滚后仍有 schemaVersion 字段（从 v3 回滚到 v2）");
-  assertEq(dbRolled.schemaVersion, 2, "回滚后 schemaVersion 为 2");
-  assertEq(dbRolled.migrations.length, 2, "回滚后迁移记录有 2 条");
+  assert("schemaVersion" in dbRolled, "回滚后仍有 schemaVersion 字段（从 v4 回滚到 v3）");
+  assertEq(dbRolled.schemaVersion, 3, "回滚后 schemaVersion 为 3");
+  assertEq(dbRolled.migrations.length, 3, "回滚后迁移记录有 3 条");
   assertEq(dbRolled.collections.tiles.length, 2, "回滚后 tiles 数据完整");
 
   const rbResult2 = await rollbackLastMigration({ autoBackup: true });
   assert(rbResult2.success, "第二次回滚执行成功");
-  assertEq(rbResult2.rolledBack.version, 2, "回滚的版本为 2");
-  assertEq(rbResult2.previousVersion, 1, "回滚后版本为 1");
+  assertEq(rbResult2.rolledBack.version, 3, "回滚的版本为 3");
+  assertEq(rbResult2.previousVersion, 2, "回滚后版本为 2");
 
   const dbRolled2 = JSON.parse(await readFile(testDbPath, "utf8"));
-  assert("schemaVersion" in dbRolled2, "回滚后仍有 schemaVersion 字段（从 v2 回滚到 v1）");
-  assertEq(dbRolled2.schemaVersion, 1, "回滚后 schemaVersion 为 1");
-  assertEq(dbRolled2.migrations.length, 1, "回滚后迁移记录有 1 条");
+  assert("schemaVersion" in dbRolled2, "回滚后仍有 schemaVersion 字段（从 v3 回滚到 v2）");
+  assertEq(dbRolled2.schemaVersion, 2, "回滚后 schemaVersion 为 2");
+  assertEq(dbRolled2.migrations.length, 2, "回滚后迁移记录有 2 条");
 }
 
 async function test5_migrationFailurePreservesOriginal() {
@@ -255,7 +256,7 @@ export function validate() {
   const realUpResult = await migrateToLatest({ autoBackup: true });
   assert(realUpResult.success === true, "正常迁移可以成功执行");
   assert(realUpResult.fromVersion === 0, "正常迁移起始版本正确");
-  assert(realUpResult.toVersion === 3, "正常迁移目标版本正确");
+  assert(realUpResult.toVersion === 4, "正常迁移目标版本正确");
 
   const allBackups = await listBackups();
   assert(allBackups.length >= 2, "至少有 2 个备份（失败场景+正常迁移）");
@@ -291,7 +292,7 @@ async function test7_startupAutoMigration() {
   assert(result.result.success === true, "自动迁移成功");
 
   const db = await loadDb();
-  assertEq(getSchemaVersion(db), 3, "自动迁移后版本为 3");
+  assertEq(getSchemaVersion(db), 4, "自动迁移后版本为 4");
 
   const result2 = await autoMigrateOnStartup();
   assert(result2.needed === false, "第二次启动无需迁移");

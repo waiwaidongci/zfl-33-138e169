@@ -119,10 +119,10 @@ async function test1_migration_v3() {
 
   const result = await migrateToLatest({ autoBackup: false });
   assert(result.success, "v3 迁移执行成功");
-  assert(result.toVersion === 3, "迁移后 schemaVersion 为 3");
+  assert(result.toVersion === 4, "迁移后 schemaVersion 为 4");
 
   const db = await loadDb();
-  assertEq(getSchemaVersion(db), 3, "数据库 schemaVersion 为 3");
+  assertEq(getSchemaVersion(db), 4, "数据库 schemaVersion 为 4");
 
   const coll = getCollections(db);
 
@@ -497,7 +497,7 @@ async function test8_available_quantity() {
 }
 
 async function test9_rollback_v3() {
-  console.log("\nTest 9: v3 迁移回滚");
+  console.log("\nTest 9: v3→v4 迁移回滚");
 
   await setupTestEnv();
   const { migrateToLatest, rollbackLastMigration } = await import("../lib/schema-migration.js");
@@ -506,30 +506,41 @@ async function test9_rollback_v3() {
   await migrateToLatest({ autoBackup: false });
 
   const dbMigrated = await loadDb();
-  assertEq(getSchemaVersion(dbMigrated), 3, "迁移后版本为 3");
+  assertEq(getSchemaVersion(dbMigrated), 4, "迁移后版本为 4");
 
-  const rbResult = await rollbackLastMigration({ autoBackup: false });
-  assert(rbResult.success, "回滚执行成功");
+  const rbResult1 = await rollbackLastMigration({ autoBackup: false });
+  assert(rbResult1.success, "回滚 v4 执行成功");
 
-  const dbRolled = await loadDb();
-  assertEq(getSchemaVersion(dbRolled), 2, "回滚后版本为 2");
+  const dbRolled1 = await loadDb();
+  assertEq(getSchemaVersion(dbRolled1), 3, "回滚 v4 后版本为 3");
 
-  const coll = getCollections(dbRolled);
-  assert(Array.isArray(coll.inventoryTransactions), "回滚后 inventoryTransactions 集合仍存在（KNOWN_COLLECTIONS 保留）");
-  assertEq(coll.inventoryTransactions.length, 0, "回滚后 inventoryTransactions 为空数组");
+  const coll1 = getCollections(dbRolled1);
+  assert(!Array.isArray(coll1.businessEvents) || coll1.businessEvents.length === 0, "回滚 v4 后 businessEvents 已移除");
+  assert(Array.isArray(coll1.inventoryTransactions), "回滚 v4 后 inventoryTransactions 集合仍存在");
+  assert(coll1.inventoryTransactions.length > 0, "回滚 v4 后 inventoryTransactions 数据保留");
 
-  for (const stock of coll.materialStocks) {
+  const rbResult2 = await rollbackLastMigration({ autoBackup: false });
+  assert(rbResult2.success, "回滚 v3 执行成功");
+
+  const dbRolled2 = await loadDb();
+  assertEq(getSchemaVersion(dbRolled2), 2, "回滚 v3 后版本为 2");
+
+  const coll2 = getCollections(dbRolled2);
+  assert(Array.isArray(coll2.inventoryTransactions), "回滚 v3 后 inventoryTransactions 集合仍存在（KNOWN_COLLECTIONS 保留）");
+  assertEq(coll2.inventoryTransactions.length, 0, "回滚 v3 后 inventoryTransactions 为空数组");
+
+  for (const stock of coll2.materialStocks) {
     assert(stock.reservedQuantity === undefined, `stock ${stock.id} reservedQuantity 已移除`);
   }
 
-  for (const tile of coll.tiles) {
+  for (const tile of coll2.tiles) {
     assert(tile.reservationIds === undefined, `tile ${tile.id} reservationIds 已移除`);
     assert(tile.inventoryReserved === undefined, `tile ${tile.id} inventoryReserved 已移除`);
     assert(tile.inventoryConsumed === undefined, `tile ${tile.id} inventoryConsumed 已移除`);
   }
 
-  const stock1 = coll.materialStocks.find(s => s.id === "MAT-001");
-  const pendingFiringTile = coll.tiles.find(t => t.id === "AG-RES-001");
+  const stock1 = coll2.materialStocks.find(s => s.id === "MAT-001");
+  const pendingFiringTile = coll2.tiles.find(t => t.id === "AG-RES-001");
   if (pendingFiringTile && pendingFiringTile.inventoryDeducted) {
     const deducted = pendingFiringTile.materialBatchRefs[0]?.deducted || 0;
     assert(stock1.quantity < 50, "回滚后 pending_firing 试片的库存已重新扣减");
