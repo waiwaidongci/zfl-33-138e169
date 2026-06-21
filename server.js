@@ -19,7 +19,9 @@ import {
   handleGetPlan,
   handleUpdatePlan,
   handleDeletePlan,
-  handleApplyPlan
+  handleApplyPlan,
+  handleGetExperimentReview,
+  handlePostExperimentReview
 } from "./lib/routes.js";
 import {
   handleListRecipes,
@@ -128,6 +130,12 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "POST" && url.pathname === "/tiles/similar") {
       const input = await readJsonBody(req);
       const r = await handleSimilarTiles(input, db);
+      return send(res, r.status, r.data);
+    }
+
+    if (req.method === "POST" && url.pathname === "/tiles/review") {
+      const input = await readJsonBody(req);
+      const r = await handlePostExperimentReview(input, db);
       return send(res, r.status, r.data);
     }
 
@@ -461,6 +469,12 @@ const server = http.createServer(async (req, res) => {
     if (tileDefectTagsMatch && req.method === "DELETE") {
       const input = await readJsonBody(req);
       const r = await handleRemoveDefectTag(tileDefectTagsMatch[1], input, db);
+      return send(res, r.status, r.data);
+    }
+
+    const tileReviewMatch = url.pathname.match(/^\/tiles\/([^/]+)\/review$/);
+    if (tileReviewMatch && req.method === "GET") {
+      const r = await handleGetExperimentReview(tileReviewMatch[1], url, db);
       return send(res, r.status, r.data);
     }
 

@@ -18,6 +18,7 @@
     "test:recipe-diff": "node tests/recipe-version-diff.test.js",
     "test:reservation": "node tests/inventory-reservation.test.js",
     "test:event": "node tests/event-audit.test.js",
-    "test:all": "node tests/migration.test.js && node tests/tile-status-workflow.test.js && node tests/import-enhanced.test.js && node tests/firing-plan-batch-apply.test.js && node tests/dashboard-compare.test.js && node tests/recipe-version-diff.test.js && node tests/inventory-reservation.test.js && node tests/event-audit.test.js"
+    "test:review": "node tests/experiment-review.test.js",
+    "test:all": "node tests/migration.test.js && node tests/tile-status-workflow.test.js && node tests/import-enhanced.test.js && node tests/firing-plan-batch-apply.test.js && node tests/dashboard-compare.test.js && node tests/recipe-version-diff.test.js && node tests/inventory-reservation.test.js && node tests/event-audit.test.js && node tests/experiment-review.test.js"
   }
 }
