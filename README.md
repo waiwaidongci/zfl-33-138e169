@@ -10,6 +10,90 @@ npm start
 
 ---
 
+## 测试与本地验证
+
+项目内置了轻量级测试运行器，不依赖第三方框架，直接使用原生 Node.js 执行。所有测试均在独立的临时数据目录（`tests/tmp/<模块名>/`）中运行，完成后自动清理。
+
+### 快速开始
+
+```bash
+# 查看所有可用模块
+npm run test:list
+
+# 运行全部测试
+npm test
+
+# CI 模式（失败立即终止，适合流水线）
+npm run test:ci
+```
+
+### 按模块运行
+
+| 命令 | 模块 | 覆盖范围 |
+|------|------|----------|
+| `npm run test:migration` | migration | Schema 迁移引擎、备份恢复、回滚 |
+| `npm run test:status` | status | 试片状态机、状态流转、权限校验 |
+| `npm run test:import` | import | CSV/JSON 批量导入、预览、去重策略 |
+| `npm run test:batch` | batch | 烧成规划、批次创建/更新/应用 |
+| `npm run test:dashboard` | dashboard | 仪表盘汇总、对比分析 |
+| `npm run test:recipe` | recipe | 配方版本、差异对比 |
+| `npm run test:inventory` | inventory | 原料入库、预留/释放/确认流水 |
+| `npm run test:event` | event | 业务事件回溯、时间线、类型统计 |
+| `npm run test:review` | review | 实验复盘、缺陷聚合、批次摘要 |
+
+也可直接调用运行器一次指定多个模块：
+
+```bash
+node tests/runner.js migration inventory event
+node tests/runner.js -m status -m batch
+```
+
+### 运行器高级选项
+
+```bash
+# 仅清理临时数据目录（测试异常中断时可用）
+npm run test:clean
+
+# 失败时保留临时数据（便于用真实数据调试）
+node tests/runner.js inventory --keep-on-fail
+
+# 查看完整帮助
+node tests/runner.js --help
+```
+
+### 环境变量约定
+
+各测试脚本通过设置以下环境变量隔离真实数据：
+
+| 变量 | 说明 |
+|------|------|
+| `ASH_GLAZE_DATA_DIR` | 数据目录，测试时指向 `tests/tmp/<模块>/data` |
+| `ASH_GLAZE_DB_PATH` | 数据文件路径，测试时指向上述目录下的 `ash-glaze.json` |
+| `ASH_GLAZE_BACKUP_DIR` | 备份目录，测试时指向上述目录下的 `backups/` |
+| `ASH_GLAZE_MIGRATIONS_DIR` | 自定义迁移脚本目录，仅迁移失败注入测试时使用 |
+
+这些约定已在公共工具 [tests/test-utils.js](file:///Users/ali/Desktop/zfl%20%20new%20solo%20coder/zfl-33/tests/test-utils.js) 中统一封装，新增测试时可直接复用。
+
+### CI 集成
+
+在 GitHub Actions / GitLab CI 中直接调用：
+
+```yaml
+# .github/workflows/test.yml (示例)
+- name: Run tests
+  run: npm run test:ci
+```
+
+运行器会自动检测 CI 环境变量（`CI=true` / `GITHUB_ACTIONS=true`），启用失败即退模式。
+
+### 新增测试用例
+
+1. 在 `tests/` 目录下创建 `xxx.test.js`，参考现有脚本结构
+2. 推荐使用 `tests/test-utils.js` 中的 `createTestContext(import.meta.url)`、`setupTestDir`、`createTestStats` 等公共工具
+3. 在 `tests/runner.js` 的 `MODULE_GROUPS` 中将新文件归属到合适的模块
+
+---
+
 ## Schema 迁移系统
 
 ### 概述
