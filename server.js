@@ -32,7 +32,8 @@ import {
   handleGetVersion,
   handleCopyVersion,
   handleGetRecipeReport,
-  handleGetVersionReport
+  handleGetVersionReport,
+  handleGetRecipeVersionDiff
 } from "./lib/recipe-routes.js";
 import {
   handleListBatches,
@@ -226,6 +227,21 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "POST" && url.pathname === "/recipes") {
       const input = await readJsonBody(req);
       const r = await handleCreateRecipe(input, db);
+      return send(res, r.status, r.data);
+    }
+
+    const recipeVersionsDiffMatch = url.pathname.match(/^\/recipes\/([^/]+)\/versions\/diff$/);
+    if (recipeVersionsDiffMatch && req.method === "GET") {
+      const versionIdA = url.searchParams.get("baseline");
+      const versionIdB = url.searchParams.get("target");
+      if (!versionIdA || !versionIdB) {
+        return send(res, 400, {
+          error: "missing_required",
+          message: "缺少 baseline 或 target 参数",
+          required: ["baseline", "target"]
+        });
+      }
+      const r = await handleGetRecipeVersionDiff(recipeVersionsDiffMatch[1], versionIdA, versionIdB, db);
       return send(res, r.status, r.data);
     }
 

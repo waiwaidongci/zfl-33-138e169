@@ -186,6 +186,7 @@ export function validate(db) {
 | GET | `/dashboard/defects-by-peak-temp?ashSource=&kiln=` | 按温度区间缺陷分布 |
 | GET | `/dashboard/low-score-tiles?threshold=&limit=&ashSource=&kiln=` | 低分样砖预警 |
 | GET | `/dashboard/compare?baselineType=&baselineValue=&targetType=&targetValue=&lowScoreThreshold=` | **两个scope对比分析**（新增） |
+| GET | `/recipes/:id/versions/diff?baseline=&target=` | **配方版本差异对比**（新增） |
 
 ---
 
@@ -1506,4 +1507,5 @@ curl "http://localhost:3033/dashboard/compare?baselineType=ashSource&baselineVal
 | 命令 | 说明 |
 |------|------|
 | `npm run test:compare` | 仅运行仪表盘对比分析测试（10 组用例，覆盖空数据/单边无评分/缺陷标签缺失/跨维度/路由等场景） |
-| `npm run test:all` | 运行全部回归测试（迁移 + 状态机 + 导入 + 批次 + 对比） |
+| `npm run test:recipe-diff` | 仅运行配方版本差异对比测试（覆盖缺失版本/跨配方/无试片数据/成分变化/缺陷变化等场景） |
+| `npm run test:all` | 运行全部回归测试（迁移 + 状态机 + 导入 + 批次 + 对比 + 配方差异） |
