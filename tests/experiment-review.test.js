@@ -572,6 +572,27 @@ await (async function testDirectReviewWithFullDb() {
   assert(result.allEvidence.length > 0, "有完整的依据溯源记录");
   const defectRuleEvidence = result.allEvidence.find(e => e.rule && e.rule.startsWith("DEFECT_REMEDY_RULES"));
   assert(defectRuleEvidence, "能追踪到缺陷整改知识库依据");
+  assertHas(result, "similarSuccessfulTiles.groupSummary", "相似样片组统计摘要来自 reports.summarizeTiles");
+  assert(result.similarSuccessfulTiles.groupSummary && result.similarSuccessfulTiles.groupSummary.count > 0, "groupSummary 包含相似样片数量");
+  assert(typeof result.similarSuccessfulTiles.groupSummary.averageScore === "number", "groupSummary 包含平均分");
+  assertHas(result, "similarSuccessfulTiles.highFrequencyDefects", "相似样片组高频缺陷来自 getHighFrequencyDefects");
+  assert(Array.isArray(result.similarSuccessfulTiles.highFrequencyDefects), "highFrequencyDefects 是数组");
+  assertHas(result, "similarSuccessfulTiles.reportsIntegration", "有 reports 模块整合标记");
+  assert(result.similarSuccessfulTiles.reportsIntegration.summarizeTilesApplied === true, "summarizeTiles 已应用");
+  assert(result.similarSuccessfulTiles.reportsIntegration.getHighFrequencyDefectsApplied === true, "getHighFrequencyDefects 已应用");
+  assertHas(result, "defectPatterns.historyDefectSummary", "缺陷模式分析包含历史缺陷摘要（来自 getDefectSummaryForTiles）");
+  assertHas(result, "defectPatterns.historyTopDefects", "缺陷模式分析包含历史高频缺陷排名");
+  assertHas(result, "recipeVersionAnalysis", "包含配方版本维度分析（来自 reports.buildTilesByVersionIndex）");
+  assertHas(result, "performanceVsSimilar", "包含与相似成功样片的性能差异对比（来自 reports.diffTilePerformance）");
+  assert(result.performanceVsSimilar && result.performanceVsSimilar.averageScore, "性能对比包含平均分差异");
+  const reportsEvidence = result.allEvidence.filter(e => e.rule && e.rule.startsWith("REPORTS_"));
+  assert(reportsEvidence.length >= 3, `allEvidence 中至少 3 条来自 reports 模块的依据 (实际 ${reportsEvidence.length})`);
+  const summarizeEvidence = result.allEvidence.find(e => e.rule === "REPORTS_SUMMARIZE_TILES");
+  assert(summarizeEvidence && summarizeEvidence.source === "reports.summarizeTiles", "REPORTS_SUMMARIZE_TILES 依据溯源正确");
+  const diffEvidence = result.allEvidence.find(e => e.rule === "REPORTS_DIFF_TILE_PERFORMANCE");
+  assert(diffEvidence && diffEvidence.source === "reports.diffTilePerformance", "REPORTS_DIFF_TILE_PERFORMANCE 依据溯源正确");
+  const versionEvidence = result.allEvidence.find(e => e.rule === "REPORTS_BUILD_TILES_BY_VERSION_INDEX");
+  assert(versionEvidence, "REPORTS_BUILD_TILES_BY_VERSION_INDEX 依据溯源存在");
   console.log("");
 })();
 
