@@ -89,6 +89,13 @@ const sampleRecipes = [
     description: "稻灰釉配方",
     createdAt: "2026-06-20",
     updatedAt: "2026-06-20"
+  },
+  {
+    id: "RC-003",
+    name: "莫干山竹灰配方",
+    description: "竹灰釉配方",
+    createdAt: "2026-06-20",
+    updatedAt: "2026-06-20"
   }
 ];
 
@@ -152,6 +159,36 @@ const sampleRecipeVersions = [
     note: "稻灰配方初始版本",
     createdAt: "2026-06-20",
     parentVersionId: null
+  },
+  {
+    id: "RCV-0005",
+    recipeId: "RC-003",
+    version: 1,
+    text: "竹灰45 长石32 石英18 高岭5",
+    ingredients: [
+      { name: "竹灰", percentage: 45 },
+      { name: "长石", percentage: 32 },
+      { name: "石英", percentage: 18 },
+      { name: "高岭", percentage: 5 }
+    ],
+    note: "竹灰配方初始版本",
+    createdAt: "2026-06-20",
+    parentVersionId: null
+  },
+  {
+    id: "RCV-0006",
+    recipeId: "RC-003",
+    version: 2,
+    text: "竹灰48 长石30 石英17 高岭5",
+    ingredients: [
+      { name: "竹灰", percentage: 48 },
+      { name: "长石", percentage: 30 },
+      { name: "石英", percentage: 17 },
+      { name: "高岭", percentage: 5 }
+    ],
+    note: "提高竹灰比例",
+    createdAt: "2026-06-21",
+    parentVersionId: "RCV-0005"
   }
 ];
 
@@ -561,6 +598,49 @@ async function test11_serverRouteParams() {
   assertEq(r2.status, 404, "target 为空时版本不存在");
 }
 
+async function test12_pathRecipeIdMismatch() {
+  console.log("\nTest 12: 路径配方ID与版本归属错配");
+
+  const { handleGetRecipeVersionDiff } = await import("../lib/recipe-routes.js");
+  const { loadDb } = await import("../lib/db.js");
+
+  await writeFile(testDbPath, JSON.stringify(makeDb([], sampleRecipes, sampleRecipeVersions), null, 2));
+  const db = await loadDb();
+
+  const r1 = await handleGetRecipeVersionDiff("RC-002", "RCV-0001", "RCV-0002", db);
+  assertEq(r1.status, 400, "两个版本都不属于路径配方（版本属于RC-001，路径是RC-002）返回 400");
+  assertEq(r1.data.error, "version_recipe_mismatch", "错误码 version_recipe_mismatch");
+  assertEq(r1.data.pathRecipeId, "RC-002", "pathRecipeId 正确");
+  assertEq(r1.data.mismatchedVersions.length, 2, "mismatchedVersions 包含 2 个版本");
+  assert(r1.data.mismatchedVersions.some(v => v.versionId === "RCV-0001"), "RCV-0001 在错配列表中");
+  assert(r1.data.mismatchedVersions.some(v => v.versionId === "RCV-0002"), "RCV-0002 在错配列表中");
+  assertEq(r1.data.mismatchedVersions[0].versionRecipeId, "RC-001", "版本真实归属配方正确");
+  assertEq(r1.data.mismatchedVersions[1].versionRecipeId, "RC-001", "第二个版本真实归属配方正确");
+
+  const r2 = await handleGetRecipeVersionDiff("RC-002", "RCV-0001", "RCV-0004", db);
+  assertEq(r2.status, 400, "版本本身分属不同配方时返回 400 跨配方错误");
+  assertEq(r2.data.error, "cross_recipe_diff_not_allowed", "cross_recipe 检查优先于归属错配");
+  assertEq(r2.data.recipeIdA, "RC-001", "recipeIdA 正确");
+  assertEq(r2.data.recipeIdB, "RC-002", "recipeIdB 正确");
+
+  const r3 = await handleGetRecipeVersionDiff("RC-003", "RCV-0005", "RCV-0006", db);
+  assertEq(r3.status, 200, "路径配方与版本归属一致时正常返回 200");
+  assert(r3.data.meta, "正常返回有 meta");
+  assertEq(r3.data.meta.recipe.id, "RC-003", "返回的配方 ID 正确");
+  assertEq(r3.data.meta.baseline.versionId, "RCV-0005", "baseline 版本正确");
+  assertEq(r3.data.meta.target.versionId, "RCV-0006", "target 版本正确");
+
+  const r4 = await handleGetRecipeVersionDiff("RC-001", "RCV-0001", "RCV-0002", db);
+  assertEq(r4.status, 200, "RC-001 路径下对比 RCV-0001 和 RCV-0002 正常返回 200");
+  assertEq(r4.data.meta.recipe.id, "RC-001", "返回的配方 ID 是 RC-001");
+
+  const r5 = await handleGetRecipeVersionDiff("RC-002", "RCV-0004", "RCV-0004", db);
+  assertEq(r5.status, 200, "同路径同配方的同一个版本也允许对比（自对比）");
+  assertEq(r5.data.meta.recipe.id, "RC-002", "返回的配方 ID 是 RC-002");
+  assertEq(r5.data.meta.baseline.versionId, "RCV-0004", "baseline 是 RCV-0004");
+  assertEq(r5.data.meta.target.versionId, "RCV-0004", "target 是 RCV-0004");
+}
+
 async function run() {
   await setupTestEnv();
   try {
@@ -575,6 +655,7 @@ async function run() {
     await test9_defectChanges();
     await test10_routeHandler();
     await test11_serverRouteParams();
+    await test12_pathRecipeIdMismatch();
   } finally {
     await cleanupTestEnv();
   }
