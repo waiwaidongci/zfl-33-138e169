@@ -41,10 +41,11 @@ function assertEq(actual, expected, msg) {
 }
 
 const testData = {
-  schemaVersion: 2,
+  schemaVersion: 3,
   migrations: [
     { version: 1, name: "introduce-schema-version", appliedAt: "2026-06-20T13:00:13.852Z" },
-    { version: 2, name: "add-tile-status-fields", appliedAt: "2026-06-20T13:00:13.852Z" }
+    { version: 2, name: "add-tile-status-fields", appliedAt: "2026-06-20T13:00:13.852Z" },
+    { version: 3, name: "add-inventory-reservation", appliedAt: "2026-06-20T13:00:13.852Z" }
   ],
   collections: {
     tiles: [
@@ -66,7 +67,10 @@ const testData = {
         status: "draft",
         statusHistory: [{ from: null, to: "draft", operator: "migration", note: "数据迁移，初始状态推断为 '草稿'", at: "2026-06-20T13:00:13.852Z" }],
         batchId: null,
-        inventoryDeducted: false
+        inventoryDeducted: false,
+        inventoryReserved: false,
+        inventoryConsumed: false,
+        reservationIds: []
       },
       {
         id: "AG-EXISTING-002",
@@ -86,7 +90,10 @@ const testData = {
         status: "pending_firing",
         statusHistory: [{ from: null, to: "pending_firing", operator: "migration", note: "数据迁移", at: "2026-06-20T13:00:13.852Z" }],
         batchId: null,
-        inventoryDeducted: false
+        inventoryDeducted: false,
+        inventoryReserved: false,
+        inventoryConsumed: false,
+        reservationIds: []
       },
       {
         id: "AG-EXISTING-003",
@@ -106,7 +113,10 @@ const testData = {
         status: "draft",
         statusHistory: [{ from: null, to: "draft", operator: "migration", note: "数据迁移", at: "2026-06-20T13:00:13.852Z" }],
         batchId: "BATCH-EXISTING",
-        inventoryDeducted: false
+        inventoryDeducted: false,
+        inventoryReserved: false,
+        inventoryConsumed: false,
+        reservationIds: []
       }
     ],
     firingPlans: [
@@ -182,12 +192,13 @@ const testData = {
       }
     ],
     materialStocks: [
-      { id: "MAT-001", name: "松灰", batchNo: "SG-2026-001", quantity: 50, unit: "kg", entryDate: "2026-05-15", reorderThreshold: 10 },
-      { id: "MAT-002", name: "长石", batchNo: "CS-2026-001", quantity: 80, unit: "kg", entryDate: "2026-05-20", reorderThreshold: 10 },
-      { id: "MAT-003", name: "石英", batchNo: "SY-2026-001", quantity: 60, unit: "kg", entryDate: "2026-05-22", reorderThreshold: 10 },
-      { id: "MAT-004", name: "红土", batchNo: "HT-2026-001", quantity: 30, unit: "kg", entryDate: "2026-06-01", reorderThreshold: 10 },
-      { id: "MAT-005", name: "稻灰", batchNo: "DG-2026-001", quantity: 0.5, unit: "kg", entryDate: "2026-06-10", reorderThreshold: 10 }
-    ]
+      { id: "MAT-001", name: "松灰", batchNo: "SG-2026-001", quantity: 50, reservedQuantity: 0, unit: "kg", entryDate: "2026-05-15", reorderThreshold: 10 },
+      { id: "MAT-002", name: "长石", batchNo: "CS-2026-001", quantity: 80, reservedQuantity: 0, unit: "kg", entryDate: "2026-05-20", reorderThreshold: 10 },
+      { id: "MAT-003", name: "石英", batchNo: "SY-2026-001", quantity: 60, reservedQuantity: 0, unit: "kg", entryDate: "2026-05-22", reorderThreshold: 10 },
+      { id: "MAT-004", name: "红土", batchNo: "HT-2026-001", quantity: 30, reservedQuantity: 0, unit: "kg", entryDate: "2026-06-01", reorderThreshold: 10 },
+      { id: "MAT-005", name: "稻灰", batchNo: "DG-2026-001", quantity: 0.5, reservedQuantity: 0, unit: "kg", entryDate: "2026-06-10", reorderThreshold: 10 }
+    ],
+    inventoryTransactions: []
   }
 };
 
@@ -275,7 +286,8 @@ async function test1_batch_apply_create_new_tiles() {
   assert(tile1 !== undefined, "AG-BATCH-NEW-001 存在");
   assertEq(tile1.status, TILE_STATUSES.PENDING_FIRING, "试片1状态为待烧成");
   assertEq(tile1.batchId, result.data.batch.id, "试片1关联正确的批次");
-  assert(tile1.inventoryDeducted === true, "试片1库存已扣减");
+  assert(tile1.inventoryReserved === true, "试片1库存已预留");
+  assert(tile1.inventoryDeducted === true, "试片1 inventoryDeducted 兼容字段同步更新");
   assertEq(tile1.fromPlanId, "FP-TEST-BATCH-001", "试片1关联规划");
   assertEq(tile1.firingCurve.length, 6, "试片1有完整的烧成曲线");
   assertEq(tile1.peakTemp, 1240, "试片1峰值温度来自规划");
@@ -289,15 +301,19 @@ async function test1_batch_apply_create_new_tiles() {
   assertEq(plan.appliedBatchId, result.data.batch.id, "规划记录 appliedBatchId");
   assertEq(plan.appliedTileIds.length, 2, "规划记录 appliedTileIds");
 
-  const finalStockSG = coll.materialStocks.find(s => s.batchNo === "SG-2026-001").quantity;
-  const finalStockCS = coll.materialStocks.find(s => s.batchNo === "CS-2026-001").quantity;
-  const finalStockSY = coll.materialStocks.find(s => s.batchNo === "SY-2026-001").quantity;
-  const finalStockHT = coll.materialStocks.find(s => s.batchNo === "HT-2026-001").quantity;
+  const finalStockSG = coll.materialStocks.find(s => s.batchNo === "SG-2026-001");
+  const finalStockCS = coll.materialStocks.find(s => s.batchNo === "CS-2026-001");
+  const finalStockSY = coll.materialStocks.find(s => s.batchNo === "SY-2026-001");
+  const finalStockHT = coll.materialStocks.find(s => s.batchNo === "HT-2026-001");
 
-  assertEq(finalStockSG, Number((initialStockSG - 4.2 - 2.5).toFixed(2)), "松灰库存扣减正确：10kg×42% + 5kg×50% = 4.2+2.5=6.7");
-  assertEq(finalStockCS, Number((initialStockCS - 3.5 - 1.5).toFixed(2)), "长石库存扣减正确：10kg×35% + 5kg×30% = 3.5+1.5=5.0");
-  assertEq(finalStockSY, Number((initialStockSY - 1.8 - 1.0).toFixed(2)), "石英库存扣减正确：10kg×18% + 5kg×20% = 1.8+1.0=2.8");
-  assertEq(finalStockHT, Number((initialStockHT - 0.5).toFixed(2)), "红土库存扣减正确：10kg×5% = 0.5");
+  assertEq(finalStockSG.quantity, initialStockSG, "松灰库存未扣减（预留模式，quantity不变）");
+  assertEq(finalStockSG.reservedQuantity, Number((4.2 + 2.5).toFixed(2)), "松灰预留量正确：10kg×42% + 5kg×50% = 6.7");
+  assertEq(finalStockCS.quantity, initialStockCS, "长石库存未扣减（预留模式，quantity不变）");
+  assertEq(finalStockCS.reservedQuantity, Number((3.5 + 1.5).toFixed(2)), "长石预留量正确：10kg×35% + 5kg×30% = 5.0");
+  assertEq(finalStockSY.quantity, initialStockSY, "石英库存未扣减（预留模式，quantity不变）");
+  assertEq(finalStockSY.reservedQuantity, Number((1.8 + 1.0).toFixed(2)), "石英预留量正确：10kg×18% + 5kg×20% = 2.8");
+  assertEq(finalStockHT.quantity, initialStockHT, "红土库存未扣减（预留模式，quantity不变）");
+  assertEq(finalStockHT.reservedQuantity, 0.5, "红土预留量正确：10kg×5% = 0.5");
 
   assert(result.data.transitions.length === 2, "有 2 个状态转换记录");
   for (const trans of result.data.transitions) {
@@ -345,7 +361,8 @@ async function test2_batch_apply_associate_existing_tiles() {
   assert(tile !== undefined, "AG-EXISTING-001 存在");
   assertEq(tile.status, TILE_STATUSES.PENDING_FIRING, "现有试片状态推进到待烧成");
   assertEq(tile.batchId, result.data.batch.id, "现有试片关联批次");
-  assert(tile.inventoryDeducted === true, "现有试片库存已扣减");
+  assert(tile.inventoryReserved === true, "现有试片库存已预留");
+  assert(tile.inventoryDeducted === true, "inventoryDeducted 兼容字段同步更新");
   assertEq(tile.firingCurve.length, 6, "现有试片获得规划的烧成曲线");
   assertEq(tile.peakTemp, 1240, "现有试片峰值温度更新为规划值");
   assertEq(tile.kiln, "K-2", "现有试片窑炉更新为规划值");
@@ -656,6 +673,8 @@ async function test11_batch_apply_inventory_deduction_rollback() {
 
   const initialStockSG = coll.materialStocks.find(s => s.batchNo === "SG-2026-001").quantity;
   const initialStockCS = coll.materialStocks.find(s => s.batchNo === "CS-2026-001").quantity;
+  const initialReservedSG = coll.materialStocks.find(s => s.batchNo === "SG-2026-001").reservedQuantity;
+  const initialReservedCS = coll.materialStocks.find(s => s.batchNo === "CS-2026-001").reservedQuantity;
 
   const result = await handleApplyPlan("FP-TEST-BATCH-001", {
     applyMode: "batch",
@@ -682,11 +701,13 @@ async function test11_batch_apply_inventory_deduction_rollback() {
 
   assertEq(result.status, 400, "验证失败返回 400");
 
-  const finalStockSG = coll.materialStocks.find(s => s.batchNo === "SG-2026-001").quantity;
-  const finalStockCS = coll.materialStocks.find(s => s.batchNo === "CS-2026-001").quantity;
+  const finalStockSG = coll.materialStocks.find(s => s.batchNo === "SG-2026-001");
+  const finalStockCS = coll.materialStocks.find(s => s.batchNo === "CS-2026-001");
 
-  assertEq(finalStockSG, initialStockSG, "验证失败时松灰库存未扣减");
-  assertEq(finalStockCS, initialStockCS, "验证失败时长石库存未扣减");
+  assertEq(finalStockSG.quantity, initialStockSG, "验证失败时松灰库存未扣减");
+  assertEq(finalStockSG.reservedQuantity, initialReservedSG, "验证失败时松灰预留量未变");
+  assertEq(finalStockCS.quantity, initialStockCS, "验证失败时长石库存未扣减");
+  assertEq(finalStockCS.reservedQuantity, initialReservedCS, "验证失败时长石预留量未变");
 
   const batchCount = coll.batches.filter(b => b.name === "测试原子性").length;
   assertEq(batchCount, 0, "验证失败时未创建批次");

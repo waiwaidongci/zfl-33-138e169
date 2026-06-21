@@ -536,6 +536,153 @@ async function test9_rollback_v3() {
   }
 }
 
+async function test10_reserve_partial_failure_rollback() {
+  console.log("\nTest 10: 预留部分失败时回滚已创建的流水和预留量");
+
+  await setupTestEnv();
+  const { loadDb, getCollections } = await import("../lib/db.js");
+  const { migrateToLatest } = await import("../lib/schema-migration.js");
+  const { reserveStock, ensureInventoryCollection, validateStockForDeduction } = await import("../lib/inventory-repository.js");
+  const { parseIngredients } = await import("../lib/recipe-repository.js");
+
+  await migrateToLatest({ autoBackup: false });
+  const db = await loadDb();
+  const coll = getCollections(db);
+  ensureInventoryCollection(db);
+
+  const stock1 = coll.materialStocks.find(s => s.id === "MAT-001");
+  stock1.quantity = 100;
+  stock1.reservedQuantity = 0;
+
+  const stock2 = coll.materialStocks.find(s => s.id === "MAT-002");
+  stock2.quantity = 0.5;
+  stock2.reservedQuantity = 0;
+
+  const tile = coll.tiles.find(t => t.id === "AG-RES-001");
+  tile.status = "draft";
+  tile.inventoryReserved = false;
+  tile.inventoryConsumed = false;
+  tile.reservationIds = [];
+  tile.materialBatchRefs = [
+    { ingredientName: "松灰", batchNo: "SG-2026-001" },
+    { ingredientName: "长石", batchNo: "CS-2026-001" }
+  ];
+  tile.batchWeight = 10;
+
+  const ingredients = parseIngredients(tile.recipe);
+  const validation = validateStockForDeduction(db, tile.materialBatchRefs, ingredients, tile.batchWeight);
+  assert(validation.valid === false, "验证应失败（长石库存不足）");
+  assert(validation.errors.length > 0, "有库存不足错误");
+
+  const initialTxnCount = coll.inventoryTransactions.length;
+  const initialReserved1 = stock1.reservedQuantity;
+  const initialReserved2 = stock2.reservedQuantity;
+
+  const deductions = [
+    { stockId: "MAT-001", ingredientName: "松灰", batchNo: "SG-2026-001", requiredQuantity: 4.2, unit: "kg" },
+    { stockId: "MAT-002", ingredientName: "长石", batchNo: "CS-2026-001", requiredQuantity: 3.5, unit: "kg" }
+  ];
+
+  let threw = false;
+  try {
+    reserveStock(db, tile, deductions);
+  } catch (err) {
+    threw = true;
+  }
+  assert(threw === true, "预留部分失败时抛出异常");
+
+  assertEq(stock1.reservedQuantity, initialReserved1, "失败后松灰 reservedQuantity 回滚");
+  assertEq(stock2.reservedQuantity, initialReserved2, "失败后长石 reservedQuantity 回滚");
+  assertEq(coll.inventoryTransactions.length, initialTxnCount, "失败后 inventoryTransactions 数量不变（已回滚）");
+  assert(tile.inventoryReserved === false, "失败后 tile.inventoryReserved 仍为 false");
+}
+
+async function test11_batch_apply_reservation_mode() {
+  console.log("\nTest 11: 一键批次应用走预留模式（quantity 不变，reservedQuantity 增加）");
+
+  await setupTestEnv();
+  const { loadDb, getCollections } = await import("../lib/db.js");
+  const { migrateToLatest } = await import("../lib/schema-migration.js");
+  const { handleApplyPlan } = await import("../lib/routes.js");
+  const { TILE_STATUSES } = await import("../lib/tile-status-machine.js");
+
+  await migrateToLatest({ autoBackup: false });
+  const db = await loadDb();
+  const coll = getCollections(db);
+
+  const plan = {
+    id: "FP-RESERVE-TEST",
+    name: "预留测试规划",
+    status: "draft",
+    kiln: "K-2",
+    peakTemp: 1240,
+    holdMinutes: 35,
+    heatingStages: [],
+    firingCurve: [{ temp: 25, minutes: 0 }, { temp: 1240, minutes: 500 }],
+    totalDurationMinutes: 500,
+    heatingRates: [],
+    risks: [],
+    riskCount: { danger: 0, warning: 0, info: 0 },
+    similarCurves: [],
+    notes: "",
+    createdAt: "2026-06-21",
+    updatedAt: "2026-06-21",
+    appliedTileId: null
+  };
+  coll.firingPlans.push(plan);
+
+  coll.materialStocks.push(
+    { id: "MAT-003", name: "石英", batchNo: "SY-2026-001", quantity: 60, reservedQuantity: 0, unit: "kg", entryDate: "2026-05-22", reorderThreshold: 10 },
+    { id: "MAT-004", name: "红土", batchNo: "HT-2026-001", quantity: 30, reservedQuantity: 0, unit: "kg", entryDate: "2026-06-01", reorderThreshold: 10 }
+  );
+
+  const stock1 = coll.materialStocks.find(s => s.batchNo === "SG-2026-001");
+  const stock2 = coll.materialStocks.find(s => s.batchNo === "CS-2026-001");
+  const initialQty1 = stock1.quantity;
+  const initialQty2 = stock2.quantity;
+
+  const result = await handleApplyPlan("FP-RESERVE-TEST", {
+    applyMode: "batch",
+    batchName: "预留模式测试批次",
+    plannedDate: "2026-06-25",
+    targetAtmosphere: "还原",
+    operator: "test_user",
+    tiles: [
+      {
+        id: "AG-BATCH-RESERVE-001",
+        body: "粗陶坯",
+        recipe: "松灰42 长石35 石英18 红土5",
+        ashSource: "南山松灰",
+        materialBatchRefs: [
+          { ingredientName: "松灰", batchNo: "SG-2026-001" },
+          { ingredientName: "长石", batchNo: "CS-2026-001" },
+          { ingredientName: "石英", batchNo: "SY-2026-001" },
+          { ingredientName: "红土", batchNo: "HT-2026-001" }
+        ],
+        batchWeight: 10
+      }
+    ]
+  }, db);
+
+  assertEq(result.status, 201, "批次创建成功");
+
+  assertEq(stock1.quantity, initialQty1, "松灰 quantity 不变（预留模式）");
+  assert(stock1.reservedQuantity > 0, "松灰 reservedQuantity 增加");
+  assertEq(stock2.quantity, initialQty2, "长石 quantity 不变（预留模式）");
+  assert(stock2.reservedQuantity > 0, "长石 reservedQuantity 增加");
+
+  const tile = coll.tiles.find(t => t.id === "AG-BATCH-RESERVE-001");
+  assertEq(tile.status, TILE_STATUSES.PENDING_FIRING, "试片状态为待烧成");
+  assert(tile.inventoryReserved === true, "试片已预留库存");
+  assert(tile.inventoryConsumed === false, "试片未消耗库存");
+
+  const reserveTxns = coll.inventoryTransactions.filter(t => t.tileId === "AG-BATCH-RESERVE-001" && t.type === "reserve");
+  assert(reserveTxns.length > 0, "生成了 reserve 类型流水");
+  for (const txn of reserveTxns) {
+    assertEq(txn.status, "active", "reserve 流水状态为 active");
+  }
+}
+
 async function run() {
   try {
     await setupTestEnv();
@@ -548,6 +695,8 @@ async function run() {
     await test7_transaction_traceability();
     await test8_available_quantity();
     await test9_rollback_v3();
+    await test10_reserve_partial_failure_rollback();
+    await test11_batch_apply_reservation_mode();
 
     console.log(`\n========== Results: ${passed} passed, ${failed} failed ==========`);
     if (failed > 0) {

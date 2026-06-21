@@ -287,7 +287,7 @@ try {
   const sufficientResult = await validateTileBusinessRules(db, sufficientInput, { autoCreateRecipe: false });
   assert(sufficientResult.valid === true, "库存充足时应通过校验");
   assert(sufficientResult.materialBatchRefs !== null, "应返回处理后的materialBatchRefs");
-  assert(sufficientResult.materialBatchRefs[0].deducted !== undefined, "应包含扣减数量");
+  assert(sufficientResult.materialBatchRefs[0].unit !== undefined, "应包含计量单位（预留模式下不再预设 deducted）");
 
   const insufficientInput = {
     body: "粗陶坯",
@@ -416,11 +416,11 @@ try {
   assertEq(insertedTile.recipeVersionId, "RCV-0001", "recipeVersionId应正确");
   assert(insertedTile.defectTags.length === 1, "defectTags应被正确设置");
   assert(insertedTile.materialBatchRefs.length === 4, "materialBatchRefs应被正确设置");
-  assert(insertedTile.materialBatchRefs[0].deducted !== undefined, "应包含扣减数量");
-  assert(insertedTile.inventoryDeducted === true, "库存应已被扣减");
+  assert(insertedTile.materialBatchRefs[0].deducted === undefined, "草稿试片不预设 deducted（预留模式下确认消耗时设置）");
+  assert(insertedTile.inventoryDeducted === false, "草稿试片 inventoryDeducted 为 false（预留模式下进入待烧成时预留）");
 
   const stockAfter = db.collections.materialStocks.find(s => s.id === "MAT-001");
-  assertEq(stockAfter.quantity, 45.8, "松灰库存应扣减4.2kg (50 - 4.2 = 45.8)");
+  assertEq(stockAfter.quantity, 50, "松灰库存未即时扣减（预留模式下进入待烧成时才预留）");
 
   mod.previewCacheDelete(previewToken);
 } catch (e) {
@@ -588,7 +588,7 @@ try {
     const db = await loadDb();
     const insertedTile = db.collections.tiles.find(t => t.id === "AG-HTTP-001");
     assert(insertedTile !== undefined, "HTTP提交后应写入试片");
-    assertEq(insertedTile.inventoryDeducted, true, "HTTP提交后应扣减库存");
+    assertEq(insertedTile.inventoryDeducted, false, "HTTP提交后草稿试片 inventoryDeducted 为 false（预留模式下需进入待烧成才预留）");
   } finally {
     await stopServer(child);
   }
